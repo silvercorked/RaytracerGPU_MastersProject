@@ -1,0 +1,29 @@
+#version 450
+
+layout (binding = 0) uniform ParameterUBO {
+	float iteration;
+} ubo;
+
+struct Logistic {
+	float x;
+	float r;
+};
+
+layout(std140, binding = 1) readonly buffer LogisticSSBOIn {
+	Logistic logisticsIn[ ];
+};
+layout(std140, binding = 2) buffer LogisticSSBOOut {
+	Logistic logisticsOut[ ];
+};
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+void main() {
+	uint index = gl_GlobalInvocationID.x;
+
+	Logistic curr = logisticsIn[index];
+
+	logisticsOut[index].r = curr.r;
+	logisticsOut[index].x = curr.x * curr.r * (1.0f - curr.x);
+
+}

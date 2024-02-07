@@ -1,0 +1,39 @@
+Constructing a GPU-based Real-time Raytracer which assembles and uses a Bounding Volume Hierarchy in
+a Vulkan Compute Shader, Raytraces using a Vulkan Compute Shader, then draws to screen using
+the Vulkan Graphics pipeline which will run the scene triangles through the vertex shader
+and the raytraced 2D image of colors through the fragment shader, resulting in a raytraced image.
+
+Step 1:
+    - make a vulkan compute shader do something and produce output
+        - ill do the generation of a bifurcation plot of the logistic map
+
+Step 1.5: (optional)
+    - create 3D space with camera and keyboard movement to view graph in
+        - walking close to points makes them invisible (or discarded) till distance increases
+        - could continue to compute and put increases in compute iterations behind prev iterations
+        - would mean turning logistic (x, r) pairs into vertices probably
+
+Step 2:
+    - setup the compute shader to calculate color values for a scene using gpu-based raytracing
+        - will use some previous work done in my Raytracer project
+        - no bvh will be used here
+        - still not sure what the use of the graphics pipeline is if the image is just the raytraced result
+            - perhaps im thinking the raytracing will achieve more than it actually will?
+
+Step 3:
+    - create a bvh on the cpu and sent it to the gpu to improve raytracing speed and framerate
+        - should be able to store it inside an Shader Storage Buffer Object or even a Uniform Buffer since the size is known
+        - not sure how to maintain that pointer-based relationship in the glsl shader language
+
+Step 4:
+    - move bvh construction onto the the gpu, perhaps in it's own compute shader before the raytracing compute shader
+        - will be following the idea from a paper on this one
+            - title: Fast Parallel Bounding Volume Hierarchy Construction
+	            authors: Xiaozi Guo, Juan Zhang, Mingquan Zhou
+	            publication date: April 16, 2020
+	            doi: 10.1109/IPEC49694.2020.9115145
+
+Stretch Goals/Extra Goals:
+- add post processing steps (ie. image -> image transformations after the graphics pipeline runs)
+- asynchronous compute shaders
+- gravity-based render system and bouncy ball scene
