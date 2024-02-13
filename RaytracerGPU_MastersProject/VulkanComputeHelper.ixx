@@ -15,8 +15,9 @@ module;
 export module VulkanComputeHelper;
 
 import PrimitiveTypes;
+import Bitmap;
 
-constexpr const u32 SAMPLE_COUNT = 1024*1024;
+constexpr const u32 SAMPLE_COUNT = 1024*1024*16;
 
 // local callback functions. not part of any class
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
@@ -182,36 +183,54 @@ export class VulkanComputeHelper {
 		auto currentTime = std::chrono::high_resolution_clock::now();
 
 		// read computed result
-		VkBuffer stagingBuffer;
-		VkDeviceMemory stagingBufferMemory;
-		const auto bufferSize = sizeof(Logistic) * SAMPLE_COUNT;
+		{
+			VkBuffer stagingBuffer;
+			VkDeviceMemory stagingBufferMemory;
+			const auto bufferSize = sizeof(Logistic) * SAMPLE_COUNT;
 
-		this->createBuffer(
-			bufferSize,
-			VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-			stagingBuffer,
-			stagingBufferMemory
-		);
+			this->createBuffer(
+				bufferSize,
+				VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+				stagingBuffer,
+				stagingBufferMemory
+			);
 
-		void* data;
-		vkMapMemory(this->device, stagingBufferMemory, 0, bufferSize, 0, &data);
-		
-		this->copyBuffer(this->shaderStorageBuffers[this->iteration % 2], stagingBuffer, bufferSize);
+			void* data;
+			vkMapMemory(this->device, stagingBufferMemory, 0, bufferSize, 0, &data);
 
-		vkUnmapMemory(this->device, stagingBufferMemory);
-		// data has stuff now?
-		Logistic* logistics = reinterpret_cast<Logistic*>(data);
-		std::vector<Logistic> resultFromGPU{};
-		resultFromGPU.reserve(SAMPLE_COUNT);
-		for (u32 i = 0; i < SAMPLE_COUNT; i++) {
-			resultFromGPU.push_back(logistics[i]);
+			this->copyBuffer(this->shaderStorageBuffers[this->iteration % 2], stagingBuffer, bufferSize);
+
+			vkUnmapMemory(this->device, stagingBufferMemory);
+			// data has stuff now?
+			Logistic* logistics = reinterpret_cast<Logistic*>(data);
+			std::vector<Logistic> resultFromGPU{};
+			resultFromGPU.reserve(SAMPLE_COUNT);
+			for (u32 i = 0; i < SAMPLE_COUNT; i++) {
+				resultFromGPU.push_back(logistics[i]);
+			}
+			std::cout << "one result: \n\t"
+				<< "x: " << resultFromGPU.at(0).x << " r: " << resultFromGPU.at(0).r << std::endl;
+			const u32 imageSize = 10000;
+			u32 weirdPixelCount = 0;
+			Bitmap bmp(imageSize, imageSize, 255);
+			for (u32 i = 0; i < resultFromGPU.size(); i++) {
+				//if (this->iteration != 1 && std::abs(0.5f - resultFromGPU.at(i).x) <= 0.001f) {
+				//	std::cout << "Good point at i=" << i <<
+				//		" x:" << resultFromGPU.at(i).x <<
+				//		" r:" << resultFromGPU.at(i).r << " size: " << resultFromGPU.size() << std::endl;
+				//}
+				bmp.setPixel(
+					static_cast<u32>((resultFromGPU.at(i).r - 3.5f) * (static_cast<float>(imageSize - 1) * 2.0f)),
+					imageSize - static_cast<u32>(resultFromGPU.at(i).x * static_cast<float>(imageSize - 1)),
+					Bitmap::RED
+				);
+			}
+			bmp.saveBitmap("logistic_gpu_" + std::to_string(this->iteration) + "_iterations.bmp");
+
+			vkDestroyBuffer(this->device, stagingBuffer, nullptr);
+			vkFreeMemory(this->device, stagingBufferMemory, nullptr);
 		}
-		std::cout << "one result: \n\t"
-			<< "x: " << resultFromGPU.at(0).x << " r: " << resultFromGPU.at(0).r << std::endl;
-
-		vkDestroyBuffer(this->device, stagingBuffer, nullptr);
-		vkFreeMemory(this->device, stagingBufferMemory, nullptr);
 		// end read computed result
 
 		auto newTime = std::chrono::high_resolution_clock::now();
@@ -242,6 +261,7 @@ public:
 	auto mainLoop() -> void {
 		auto currentTime = std::chrono::high_resolution_clock::now();
 		while (true) {
+			if (this->iteration > 102) break;
 			auto newTime = std::chrono::high_resolution_clock::now();
 			float frameTime = std::chrono::duration<float, std::chrono::milliseconds::period>(newTime - currentTime).count();
 			currentTime = newTime;
@@ -605,12 +625,12 @@ auto VulkanComputeHelper::createCommandPool() -> void {
 auto VulkanComputeHelper::createShaderStorageBuffers() -> void {
 	// initialize logistic sample points
 	std::default_random_engine rndEngine((unsigned)time(nullptr));
-	std::uniform_real_distribution<float> rndDist(0.0f, 4.0f); // parameter r is 0-4, x input is 0-1
+	std::uniform_real_distribution<float> rndDist(0.0f, 1.0f); // parameter r is 0-4, x input is 0-1
 
 	std::vector<Logistic> points(SAMPLE_COUNT);
 	for (auto& point : points) {
-		point.r = 4.0f;			// r: 0-4
-		point.x = rndDist(rndEngine) / 4.0f;	// x: 0-1
+		point.r = 3.5f + (rndDist(rndEngine) / 2.0f);			// r: 3.5-4
+		point.x = rndDist(rndEngine);					// x: 0-1
 	}
 
 	VkDeviceSize bufferSize = sizeof(Logistic) * SAMPLE_COUNT;
@@ -860,7 +880,7 @@ void VulkanComputeHelper::recordComputeCommandBuffer(VkCommandBuffer commandBuff
 		nullptr
 	);
 
-	vkCmdDispatch(commandBuffer, SAMPLE_COUNT / 256, 1, 1);
+	vkCmdDispatch(commandBuffer, SAMPLE_COUNT / 1024, 1, 1);
 
 	if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
 		throw std::runtime_error("failed to record compute command buffer!");

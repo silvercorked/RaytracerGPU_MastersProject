@@ -9,14 +9,14 @@ struct Logistic {
 	float r;
 };
 
-layout(std140, binding = 1) readonly buffer LogisticSSBOIn {
+layout(std430, binding = 1) readonly buffer LogisticSSBOIn {
 	Logistic logisticsIn[ ];
 };
-layout(std140, binding = 2) buffer LogisticSSBOOut {
+layout(std430, binding = 2) writeonly buffer LogisticSSBOOut {
 	Logistic logisticsOut[ ];
 };
 
-layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+layout(local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 
 void main() {
 	uint index = gl_GlobalInvocationID.x;
