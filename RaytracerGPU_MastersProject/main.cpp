@@ -3,10 +3,10 @@
 #include <iostream>
 #include <stdexcept>
 
-import BifurcationPlotter1D;
+import BifurcationPlotter;
 
 int main() {
-    BifurcationPlotter1D graph{};
+    BifurcationPlotter graph{};
 
     /*
     Bitmap bmp;

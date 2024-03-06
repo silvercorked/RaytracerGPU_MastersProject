@@ -5,7 +5,7 @@ module;
 
 
 
-export module BifurcationPlotter1D;
+export module BifurcationPlotter;
 
 /*
 	Created a bifurcation diagram of a 1D map
@@ -17,7 +17,7 @@ import PrimitiveTypes;
 import Bitmap;
 import VulkanComputeHelper;
 
-export class BifurcationPlotter1D {
+export class BifurcationPlotter {
 	u32 sampleSize;
 	double minVar;
 	double maxVar;
@@ -27,8 +27,8 @@ export class BifurcationPlotter1D {
 	VulkanComputeHelper vulkanCompute;
 
 public:
-	BifurcationPlotter1D();
-	~BifurcationPlotter1D() = default;
+	BifurcationPlotter();
+	~BifurcationPlotter() = default;
 
 	auto setSampleSize(u32)-> void;
 	auto setMinAndMaxOfVariable(f64, f64) -> void;
@@ -40,7 +40,7 @@ private:
 
 };
 
-BifurcationPlotter1D::BifurcationPlotter1D() :
+BifurcationPlotter::BifurcationPlotter() :
 	vulkanCompute()
 {
 	this->vulkanCompute.mainLoop();

@@ -1,15 +1,18 @@
 Why am I doing this? What am I solving?
+
 In order to make runtime raytracing feasible, it's necessary to optimize some of the more expensive
 components of a monte-carlo raytracer. The inclusion of a BVH (bounding volume hierarchy) reduces
 the runtime cost of hit detection, however, the cost of building the BVH and transferring it to the gpu
-is expensive. To the balancing realistic rendering techniques with runtime performance, this paper aims to:
+is expensive. To balance realistic rendering techniques with runtime performance, this paper aims
+to implement a method of building the BVH on the gpu described by {citation}.
+(perhaps add in that, alongside an implementation, comparisons can also be made (though don't wanna give myself more work than is necessary)) 
 
 Constructing a GPU-based Real-time Raytracer which assembles and uses a Bounding Volume Hierarchy in
-a Vulkan Compute Shader, Raytraces using a Vulkan Compute Shader, then draws to screen using
+a Vulkan Compute Shader. Raytraces using a Vulkan Compute Shader, then draws to screen using
 the Vulkan Graphics pipeline which will run the scene triangles through the vertex shader
 and the raytraced 2D image of colors through the fragment shader, resulting in a raytraced image.
 
-Step 1:
+Step 1: (Done)
     - make a vulkan compute shader do something and produce output
         - ill do the generation of a bifurcation plot of the logistic map
 

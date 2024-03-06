@@ -139,18 +139,38 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="utils\Bitmap.cpp" />
+    <ClCompile Include="VulkanWrapper\abstract\Pipeline.cpp" />
+    <ClCompile Include="VulkanWrapper\abstract\Pipeline.ixx" />
+    <ClCompile Include="VulkanWrapper\Buffer.cpp" />
+    <ClCompile Include="VulkanWrapper\Buffer.ixx" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="Bitmap.ixx" />
-    <ClCompile Include="BifurcationPlotter1D.ixx" />
-    <ClCompile Include="PrimitiveTypes.ixx" />
+    <ClCompile Include="utils\Bitmap.ixx" />
+    <ClCompile Include="BifurcationPlotter.ixx" />
+    <ClCompile Include="utils\PrimitiveTypes.ixx" />
     <ClCompile Include="VulkanComputeHelper.ixx" />
+    <ClCompile Include="VulkanWrapper\Camera.cpp" />
+    <ClCompile Include="VulkanWrapper\Camera.ixx" />
+    <ClCompile Include="VulkanWrapper\Descriptors.cpp" />
+    <ClCompile Include="VulkanWrapper\Descriptors.ixx" />
+    <ClCompile Include="VulkanWrapper\Device.cpp" />
+    <ClCompile Include="VulkanWrapper\Device.ixx" />
+    <ClCompile Include="VulkanWrapper\Model.cpp" />
+    <ClCompile Include="VulkanWrapper\Model.ixx" />
+    <ClCompile Include="VulkanWrapper\GraphicsPipeline.cpp" />
+    <ClCompile Include="VulkanWrapper\GraphicsPipeline.ixx" />
+    <ClCompile Include="VulkanWrapper\Renderer.cpp" />
+    <ClCompile Include="VulkanWrapper\Renderer.ixx" />
+    <ClCompile Include="VulkanWrapper\SwapChain.cpp" />
+    <ClCompile Include="VulkanWrapper\SwapChain.ixx" />
+    <ClCompile Include="VulkanWrapper\Utils.ixx" />
+    <ClCompile Include="VulkanWrapper\VulkanWrap.ixx" />
+    <ClCompile Include="VulkanWrapper\Window.cpp" />
+    <ClCompile Include="VulkanWrapper\Window.ixx" />
   </ItemGroup>
   <ItemGroup>
     <None Include="compile.bat" />
     <None Include="shaders\compute\logistic.comp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="BifurcationPlotter1D.hpp" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="Plan.txt" />
