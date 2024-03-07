@@ -15,13 +15,13 @@ import <iostream>;
 import <set>;
 import <unordered_set>;
 
-struct SwapChainSupportDetails {
+export struct SwapChainSupportDetails {
     VkSurfaceCapabilitiesKHR capabilities;
     std::vector<VkSurfaceFormatKHR> formats;
     std::vector<VkPresentModeKHR> presentModes;
 };
 
-struct QueueFamilyIndices {
+export struct QueueFamilyIndices {
     uint32_t computeFamily;
     uint32_t graphicsFamily;
     uint32_t presentFamily;
@@ -32,13 +32,30 @@ struct QueueFamilyIndices {
 };
 
 export class Device {
+    VkInstance instance;
+    VkDebugUtilsMessengerEXT debugMessenger;
+    VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+    Window& window;
+    VkCommandPool graphicsCommandPool;
+    VkCommandPool computeCommandPool;
+    bool graphicsAndComputeSameQueueFamily;
+
+    VkDevice device_;
+    VkSurfaceKHR surface_;
+    QueueFamilyIndices queueFamilyCache;
+    VkQueue computeQueue_;
+    VkQueue graphicsQueue_;
+    VkQueue presentQueue_;
+
+    const std::vector<const char*> validationLayers = { "VK_LAYER_KHRONOS_validation" };
+    const std::vector<const char*> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
 
     void createInstance();
     void setupDebugMessenger();
     void createSurface();
     void pickPhysicalDevice();
     void createLogicalDevice();
-    void createCommandPool();
+    void createCommandPools();
 
     // helper functions
     bool isDeviceSuitable(VkPhysicalDevice device);
@@ -49,21 +66,6 @@ export class Device {
     void hasGflwRequiredInstanceExtensions();
     bool checkDeviceExtensionSupport(VkPhysicalDevice device);
     SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
-
-    VkInstance instance;
-    VkDebugUtilsMessengerEXT debugMessenger;
-    VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
-    Window& window;
-    VkCommandPool commandPool;
-
-    VkDevice device_;
-    VkSurfaceKHR surface_;
-    VkQueue computeQueue_;
-    VkQueue graphicsQueue_;
-    VkQueue presentQueue_;
-
-    const std::vector<const char*> validationLayers = { "VK_LAYER_KHRONOS_validation" };
-    const std::vector<const char*> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
 
 public:
 #ifdef NDEBUG
@@ -81,7 +83,8 @@ public:
     Device(Device&&) = delete;
     Device& operator=(Device&&) = delete;
 
-    VkCommandPool getCommandPool() { return this->commandPool; }
+    VkCommandPool getGraphicsCommandPool() { return this->graphicsCommandPool; }
+    VkCommandPool getComputeCommandPool() { return this->graphicsAndComputeSameQueueFamily ? this->graphicsCommandPool : this->computeCommandPool; }
     VkDevice device() { return this->device_; }
     VkSurfaceKHR surface() { return this->surface_; }
     VkQueue computeQueue() { return this->computeQueue_; }
@@ -101,11 +104,11 @@ public:
         VkMemoryPropertyFlags properties,
         VkBuffer& buffer,
         VkDeviceMemory& bufferMemory);
-    VkCommandBuffer beginSingleTimeCommands();
-    void endSingleTimeCommands(VkCommandBuffer commandBuffer);
-    void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
+    VkCommandBuffer beginSingleTimeCommands(VkCommandPool pool);
+    void endSingleTimeCommands(VkQueue queue, VkCommandPool pool, VkCommandBuffer commandBuffer);
+    void copyBuffer(VkQueue queue, VkCommandPool pool, VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
     void copyBufferToImage(
-        VkBuffer buffer, VkImage image, uint32_t width, uint32_t height, uint32_t layerCount);
+        VkQueue queue, VkCommandPool pool, VkBuffer buffer, VkImage image, uint32_t width, uint32_t height, uint32_t layerCount);
 
     void createImageWithInfo(
         const VkImageCreateInfo& imageInfo,

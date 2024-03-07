@@ -24,21 +24,21 @@ Buffer::Buffer(
 	VkMemoryPropertyFlags memoryPropertyFlags,
 	VkDeviceSize minOffsetAlignment
 ) :
-	device{ device },
-	instanceSize{ instanceSize },
-	instanceCount{ instanceCount },
-	usageFlags{ usageFlags },
-	memoryPropertyFlags{ memoryPropertyFlags }
+	_device{ device },
+	_instanceSize{ instanceSize },
+	_instanceCount{ instanceCount },
+	_usageFlags{ usageFlags },
+	_memoryPropertyFlags{ memoryPropertyFlags }
 {
-	this->alignmentSize = getAlignment(instanceSize, minOffsetAlignment);
-	this->bufferSize = this->alignmentSize * instanceCount;
-	device.createBuffer(this->bufferSize, this->usageFlags, this->memoryPropertyFlags, this->buffer, this->memory);
+	this->_alignmentSize = getAlignment(instanceSize, minOffsetAlignment);
+	this->_bufferSize = this->_alignmentSize * instanceCount;
+	device.createBuffer(this->_bufferSize, this->_usageFlags, this->_memoryPropertyFlags, this->_buffer, this->_memory);
 }
 
 Buffer::~Buffer() {
 	this->unmap();
-	vkDestroyBuffer(this->device.device(), this->buffer, nullptr);
-	vkFreeMemory(this->device.device(), this->memory, nullptr);
+	vkDestroyBuffer(this->_device.device(), this->_buffer, nullptr);
+	vkFreeMemory(this->_device.device(), this->_memory, nullptr);
 }
 
 /**
@@ -51,8 +51,8 @@ Buffer::~Buffer() {
 	* @return VkResult of the buffer mapping call
 	*/
 auto Buffer::map(VkDeviceSize size, VkDeviceSize offset) -> VkResult {
-	assert(this->buffer && this->memory && "Called map on buffer before create");
-	return vkMapMemory(this->device.device(), this->memory, offset, size, 0, &this->mapped);
+	assert(this->_buffer && this->_memory && "Called map on buffer before create");
+	return vkMapMemory(this->_device.device(), this->_memory, offset, size, 0, &this->_mapped);
 }
 /**
 	* Unmap a mapped memory range
@@ -60,9 +60,9 @@ auto Buffer::map(VkDeviceSize size, VkDeviceSize offset) -> VkResult {
 	* @note Does not return a result as vkUnmapMemory can't fail
 	*/
 auto Buffer::unmap() -> void {
-	if (this->mapped) {
-		vkUnmapMemory(this->device.device(), this->memory);
-		this->mapped = nullptr;
+	if (this->_mapped) {
+		vkUnmapMemory(this->_device.device(), this->_memory);
+		this->_mapped = nullptr;
 	}
 }
 
@@ -76,12 +76,12 @@ auto Buffer::unmap() -> void {
 	*
 	*/
 auto Buffer::writeToBuffer(void* data, VkDeviceSize size, VkDeviceSize offset) -> void {
-	assert(this->mapped && "Cannot copy to unmapped buffer");
+	assert(this->_mapped && "Cannot copy to unmapped buffer");
 
 	if (size == VK_WHOLE_SIZE)
-		memcpy(this->mapped, data, this->bufferSize);
+		memcpy(this->_mapped, data, this->_bufferSize);
 	else {
-		char* memOffset = (char*)this->mapped;
+		char* memOffset = (char*)this->_mapped;
 		memOffset += offset;
 		memcpy(memOffset, data, size);
 	}
@@ -100,10 +100,10 @@ auto Buffer::writeToBuffer(void* data, VkDeviceSize size, VkDeviceSize offset) -
 auto Buffer::flush(VkDeviceSize size, VkDeviceSize offset) -> VkResult {
 	VkMappedMemoryRange mappedRange = {};
 	mappedRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-	mappedRange.memory = this->memory;
+	mappedRange.memory = this->_memory;
 	mappedRange.offset = offset;
 	mappedRange.size = size;
-	return vkFlushMappedMemoryRanges(this->device.device(), 1, &mappedRange);
+	return vkFlushMappedMemoryRanges(this->_device.device(), 1, &mappedRange);
 }
 /**
 	* Invalidate a memory range of the buffer to make it visible to the host
@@ -117,7 +117,7 @@ auto Buffer::flush(VkDeviceSize size, VkDeviceSize offset) -> VkResult {
 	* @return VkResult of the invalidate call
 	*/
 auto Buffer::descriptorInfo(VkDeviceSize size, VkDeviceSize offset) -> VkDescriptorBufferInfo {
-	return VkDescriptorBufferInfo{ this->buffer, offset, size };
+	return VkDescriptorBufferInfo{ this->_buffer, offset, size };
 }
 /**
 	* Create a buffer info descriptor
@@ -130,10 +130,10 @@ auto Buffer::descriptorInfo(VkDeviceSize size, VkDeviceSize offset) -> VkDescrip
 auto Buffer::invalidate(VkDeviceSize size, VkDeviceSize offset) -> VkResult {
 	VkMappedMemoryRange mappedRange = {};
 	mappedRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-	mappedRange.memory = this->memory;
+	mappedRange.memory = this->_memory;
 	mappedRange.offset = offset;
 	mappedRange.size = size;
-	return vkInvalidateMappedMemoryRanges(this->device.device(), 1, &mappedRange);
+	return vkInvalidateMappedMemoryRanges(this->_device.device(), 1, &mappedRange);
 }
 /**
 	* Copies "instanceSize" bytes of data to the mapped buffer at an offset of index * alignmentSize
@@ -143,7 +143,7 @@ auto Buffer::invalidate(VkDeviceSize size, VkDeviceSize offset) -> VkResult {
 	*
 	*/
 auto Buffer::writeToIndex(void* data, int index) -> void {
-	this->writeToBuffer(data, this->instanceSize, index * this->alignmentSize);
+	this->writeToBuffer(data, this->_instanceSize, index * this->_alignmentSize);
 }
 /**
 	*  Flush the memory range at index * alignmentSize of the buffer to make it visible to the device
@@ -152,7 +152,7 @@ auto Buffer::writeToIndex(void* data, int index) -> void {
 	*
 	*/
 auto Buffer::flushIndex(int index) -> VkResult {
-	return this->flush(this->alignmentSize, index * alignmentSize);
+	return this->flush(this->_alignmentSize, index * _alignmentSize);
 }
 /**
 	* Create a buffer info descriptor
@@ -162,7 +162,7 @@ auto Buffer::flushIndex(int index) -> VkResult {
 	* @return VkDescriptorBufferInfo for instance at index
 	*/
 auto Buffer::descriptorInfoForIndex(int index) -> VkDescriptorBufferInfo {
-	return this->descriptorInfo(this->alignmentSize, index * this->alignmentSize);
+	return this->descriptorInfo(this->_alignmentSize, index * this->_alignmentSize);
 }
 /**
 	* Invalidate a memory range of the buffer to make it visible to the host
@@ -174,5 +174,5 @@ auto Buffer::descriptorInfoForIndex(int index) -> VkDescriptorBufferInfo {
 	* @return VkResult of the invalidate call
 	*/
 auto Buffer::invalidateIndex(int index) -> VkResult {
-	return this->invalidate(this->alignmentSize, index * this->alignmentSize);
+	return this->invalidate(this->_alignmentSize, index * this->_alignmentSize);
 }

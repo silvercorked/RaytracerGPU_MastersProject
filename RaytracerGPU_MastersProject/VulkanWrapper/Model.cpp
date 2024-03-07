@@ -55,8 +55,8 @@ auto Model::createVertexBuffers(const std::vector<Vertex>& vertices) -> void {
 		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,	// buffer will be used to hold vertex buffer data and be a destination from a staging buffer
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT // optimized device only memory
 	);
-
-	this->device.copyBuffer(stagingBuffer.getBuffer(), this->vertexBuffer->getBuffer(), bufferSize); // copy host & device side staging buffer into device only vertex buffer
+	// COMMENTED OUT CAUSE CAUSED ERROR DURING REFACTOR
+	//this->device.copyBuffer(stagingBuffer.getBuffer(), this->vertexBuffer->getBuffer(), bufferSize); // copy host & device side staging buffer into device only vertex buffer
 	// cleanup buffers
 }
 auto Model::createIndexBuffers(const std::vector<uint32_t>& indices) -> void {	// similar to vertex buffer
@@ -84,8 +84,8 @@ auto Model::createIndexBuffers(const std::vector<uint32_t>& indices) -> void {	/
 		VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, // index buffer but also destination for staging buffer copy
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT // optimized device only memory
 	);
-
-	this->device.copyBuffer(stagingBuffer.getBuffer(), this->indexBuffer->getBuffer(), bufferSize);
+	// COMMENTED OUT CAUSE CAUSED ERROR DURING REFACTOR
+	//this->device.copyBuffer(stagingBuffer.getBuffer(), this->indexBuffer->getBuffer(), bufferSize);
 }
 
 auto Model::bind(VkCommandBuffer commandBuffer) -> void {

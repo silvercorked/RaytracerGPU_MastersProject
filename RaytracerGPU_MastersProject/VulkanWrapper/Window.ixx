@@ -11,7 +11,7 @@ export class Window {
 	GLFWwindow* _window;
 	int _width;
 	int _height;
-	bool _framebufferResized = false;
+	bool _framebufferResized;
 	std::string _windowName;
 
 	static auto frambufferResizeCallback(GLFWwindow*, int, int) -> void;

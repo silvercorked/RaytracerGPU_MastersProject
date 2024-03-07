@@ -9,17 +9,17 @@ import :Device;
 import <cstring>;
 
 export class Buffer {
-	Device& device;
-	void* mapped = nullptr;
-	VkBuffer buffer = VK_NULL_HANDLE;
-	VkDeviceMemory memory = VK_NULL_HANDLE;
+	Device& _device;
+	void* _mapped = nullptr;
+	VkBuffer _buffer = VK_NULL_HANDLE;
+	VkDeviceMemory _memory = VK_NULL_HANDLE;
 
-	VkDeviceSize bufferSize;
-	uint32_t instanceCount;
-	VkDeviceSize instanceSize;
-	VkDeviceSize alignmentSize;
-	VkBufferUsageFlags usageFlags;
-	VkMemoryPropertyFlags memoryPropertyFlags;
+	VkDeviceSize _bufferSize;
+	uint32_t _instanceCount;
+	VkDeviceSize _instanceSize;
+	VkDeviceSize _alignmentSize;
+	VkBufferUsageFlags _usageFlags;
+	VkMemoryPropertyFlags _memoryPropertyFlags;
 
 	static auto getAlignment(VkDeviceSize instanceSize, VkDeviceSize minOffsetAlignment) -> VkDeviceSize;
 
@@ -51,12 +51,12 @@ public:
 	auto descriptorInfoForIndex(int index) -> VkDescriptorBufferInfo;
 	auto invalidateIndex(int index) -> VkResult;
 
-	auto getBuffer() const -> VkBuffer { return this->buffer; }
-	auto getMappedMemory() const -> void* { return this->mapped; }
-	auto getInstanceCount() const -> uint32_t { return this->instanceCount; }
-	auto getInstanceSize() const -> VkDeviceSize { return this->instanceSize; }
-	auto getAlignmentSize() const -> VkDeviceSize { return this->alignmentSize; }
-	auto getUsageFlags() const -> VkBufferUsageFlags { return this->usageFlags; }
-	auto getMemoryPropertyFlags() const -> VkMemoryPropertyFlags { return this->memoryPropertyFlags; }
-	auto getBufferSize() const -> VkDeviceSize { return this->bufferSize; }
+	auto getBuffer() const -> VkBuffer { return this->_buffer; }
+	auto getMappedMemory() const -> void* { return this->_mapped; }
+	auto getInstanceCount() const -> uint32_t { return this->_instanceCount; }
+	auto getInstanceSize() const -> VkDeviceSize { return this->_instanceSize; }
+	auto getAlignmentSize() const -> VkDeviceSize { return this->_alignmentSize; }
+	auto getUsageFlags() const -> VkBufferUsageFlags { return this->_usageFlags; }
+	auto getMemoryPropertyFlags() const -> VkMemoryPropertyFlags { return this->_memoryPropertyFlags; }
+	auto getBufferSize() const -> VkDeviceSize { return this->_bufferSize; }
 };

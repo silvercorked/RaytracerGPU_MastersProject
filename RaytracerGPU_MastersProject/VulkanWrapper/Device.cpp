@@ -50,11 +50,14 @@ Device::Device(Window& window) : window{ window } {
     this->createSurface();                // connect vulkan and glfw
     this->pickPhysicalDevice();           // graphics card select
     this->createLogicalDevice();          // map phys device into model
-    this->createCommandPool();
+    this->createCommandPools();
 }
 
 Device::~Device() {
-    vkDestroyCommandPool(this->device_, this->commandPool, nullptr);
+    vkDestroyCommandPool(this->device_, this->graphicsCommandPool, nullptr);
+    if (!this->graphicsAndComputeSameQueueFamily)
+        vkDestroyCommandPool(this->device_, this->computeCommandPool, nullptr);
+
     vkDestroyDevice(this->device_, nullptr);
 
     if (this->enableValidationLayers) {
@@ -72,7 +75,7 @@ void Device::createInstance() {
 
     VkApplicationInfo appInfo = {};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-    appInfo.pApplicationName = "LittleVulkanEngine App";
+    appInfo.pApplicationName = "MastersProject App";
     appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.pEngineName = "No Engine";
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
@@ -130,10 +133,11 @@ void Device::pickPhysicalDevice() {
 }
 
 void Device::createLogicalDevice() {
-    QueueFamilyIndices indices = this->findQueueFamilies(this->physicalDevice);
+    this->queueFamilyCache = this->findQueueFamilies(this->physicalDevice);
 
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-    std::set<uint32_t> uniqueQueueFamilies = { indices.graphicsFamily, indices.presentFamily };
+    std::set<uint32_t> uniqueQueueFamilies = { this->queueFamilyCache.graphicsFamily, this->queueFamilyCache.computeFamily, this->queueFamilyCache.presentFamily };
+    // graphics family and compute family can be the same depending on device support. In this case, a duplicate will be removed here and not cause any issues
 
     float queuePriority = 1.0f;
     for (uint32_t queueFamily : uniqueQueueFamilies) {
@@ -172,22 +176,32 @@ void Device::createLogicalDevice() {
         throw std::runtime_error("failed to create logical device!");
     }
 
-    vkGetDeviceQueue(this->device_, indices.computeFamily, 0, &this->computeQueue_);
-    vkGetDeviceQueue(this->device_, indices.graphicsFamily, 0, &this->graphicsQueue_);
-    vkGetDeviceQueue(this->device_, indices.presentFamily, 0, &this->presentQueue_);
+    vkGetDeviceQueue(this->device_, this->queueFamilyCache.computeFamily, 0, &this->computeQueue_);
+    vkGetDeviceQueue(this->device_, this->queueFamilyCache.graphicsFamily, 0, &this->graphicsQueue_);
+    vkGetDeviceQueue(this->device_, this->queueFamilyCache.presentFamily, 0, &this->presentQueue_);
 }
 
-void Device::createCommandPool() {
-    QueueFamilyIndices queueFamilyIndices = this->findPhysicalQueueFamilies();
-
+void Device::createCommandPools() {
     VkCommandPoolCreateInfo poolInfo = {};
     poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily;
+    poolInfo.queueFamilyIndex = this->queueFamilyCache.graphicsFamily;
     poolInfo.flags =
         VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
-    if (vkCreateCommandPool(this->device_, &poolInfo, nullptr, &this->commandPool) != VK_SUCCESS) {
+    if (vkCreateCommandPool(this->device_, &poolInfo, nullptr, &this->graphicsCommandPool) != VK_SUCCESS) {
         throw std::runtime_error("failed to create command pool!");
+    }
+
+    if (!this->graphicsAndComputeSameQueueFamily) {
+        VkCommandPoolCreateInfo poolInfo = {};
+        poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+        poolInfo.queueFamilyIndex = this->queueFamilyCache.computeFamily;
+        poolInfo.flags =
+            VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+
+        if (vkCreateCommandPool(this->device_, &poolInfo, nullptr, &this->computeCommandPool) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create command pool!");
+        }
     }
 }
 
@@ -341,6 +355,8 @@ QueueFamilyIndices Device::findQueueFamilies(VkPhysicalDevice device) {
             indices.presentFamilyHasValue = true;
         }
         if (indices.isComplete()) {
+            if (indices.computeFamily == indices.graphicsFamily)
+                this->graphicsAndComputeSameQueueFamily = true;
             break;
         }
         i++;
@@ -370,7 +386,8 @@ SwapChainSupportDetails Device::querySwapChainSupport(VkPhysicalDevice device) {
             device,
             this->surface_,
             &presentModeCount,
-            details.presentModes.data());
+            details.presentModes.data()
+        );
     }
     return details;
 }
@@ -437,11 +454,11 @@ void Device::createBuffer(
     vkBindBufferMemory(this->device_, buffer, bufferMemory, 0); // binding memory to buffer
 }
 
-VkCommandBuffer Device::beginSingleTimeCommands() {
+VkCommandBuffer Device::beginSingleTimeCommands(VkCommandPool pool) {
     VkCommandBufferAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandPool = commandPool;
+    allocInfo.commandPool = pool;
     allocInfo.commandBufferCount = 1;
 
     VkCommandBuffer commandBuffer;
@@ -455,7 +472,7 @@ VkCommandBuffer Device::beginSingleTimeCommands() {
     return commandBuffer;
 }
 
-void Device::endSingleTimeCommands(VkCommandBuffer commandBuffer) {
+void Device::endSingleTimeCommands(VkQueue queue, VkCommandPool pool, VkCommandBuffer commandBuffer) {
     vkEndCommandBuffer(commandBuffer);
 
     VkSubmitInfo submitInfo{};
@@ -463,14 +480,14 @@ void Device::endSingleTimeCommands(VkCommandBuffer commandBuffer) {
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &commandBuffer;
 
-    vkQueueSubmit(this->graphicsQueue_, 1, &submitInfo, VK_NULL_HANDLE);
-    vkQueueWaitIdle(this->graphicsQueue_); // can be avoided with memory barrier
+    vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE);
+    vkQueueWaitIdle(queue); // can be avoided with memory barrier
 
-    vkFreeCommandBuffers(this->device_, this->commandPool, 1, &commandBuffer);
+    vkFreeCommandBuffers(this->device_, pool, 1, &commandBuffer);
 }
 
-void Device::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
-    VkCommandBuffer commandBuffer = this->beginSingleTimeCommands();
+void Device::copyBuffer(VkQueue queue, VkCommandPool pool, VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
+    VkCommandBuffer commandBuffer = this->beginSingleTimeCommands(pool);
 
     VkBufferCopy copyRegion{};
     copyRegion.srcOffset = 0;  // Optional
@@ -478,12 +495,13 @@ void Device::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize siz
     copyRegion.size = size;
     vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
 
-    this->endSingleTimeCommands(commandBuffer);
+    this->endSingleTimeCommands(queue, pool, commandBuffer);
 }
 
 void Device::copyBufferToImage(
+    VkQueue queue, VkCommandPool pool,
     VkBuffer buffer, VkImage image, uint32_t width, uint32_t height, uint32_t layerCount) {
-    VkCommandBuffer commandBuffer = this->beginSingleTimeCommands();
+    VkCommandBuffer commandBuffer = this->beginSingleTimeCommands(pool);
 
     VkBufferImageCopy region{};
     region.bufferOffset = 0;
@@ -505,7 +523,7 @@ void Device::copyBufferToImage(
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
         1,
         &region);
-    this->endSingleTimeCommands(commandBuffer);
+    this->endSingleTimeCommands(queue, pool, commandBuffer);
 }
 
 void Device::createImageWithInfo(

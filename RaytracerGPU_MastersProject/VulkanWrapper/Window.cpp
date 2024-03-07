@@ -9,7 +9,8 @@ import <stdexcept>;
 Window::Window(int w, int h, std::string name) :
 	_width(w),
 	_height(h),
-	_windowName(name)
+	_windowName(name),
+	_framebufferResized(false)
 {
 	this->initWindow();
 }

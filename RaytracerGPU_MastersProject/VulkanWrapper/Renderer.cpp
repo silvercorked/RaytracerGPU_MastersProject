@@ -59,7 +59,9 @@ auto Renderer::createCommandBuffers() -> void {
 	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;					// primary: can be submitted to device for submission, can call secondary command buffers
 	// secondary: cannot be submitted to device for submission, but can be called by primary command buffers
-	allocInfo.commandPool = this->device.getCommandPool(); // avoid allocation and deallocating command buffer memory using command pools
+	
+	// COMMENTED OUT CAUSE CAUSED ERROR DURING REFACTOR
+	//allocInfo.commandPool = this->device.getCommandPool(); // avoid allocation and deallocating command buffer memory using command pools
 	allocInfo.commandBufferCount = static_cast<uint32_t>(this->commandBuffers.size());
 
 	if (
@@ -73,12 +75,13 @@ auto Renderer::createCommandBuffers() -> void {
 	}
 }
 auto Renderer::freeCommandBuffers() -> void {
-	vkFreeCommandBuffers(
-		this->device.device(),
-		this->device.getCommandPool(),
-		static_cast<uint32_t>(this->commandBuffers.size()),
-		this->commandBuffers.data()
-	);
+	// COMMENTED OUT CAUSE CAUSED ERROR DURING REFACTOR
+	//vkFreeCommandBuffers(
+	//	this->device.device(),
+	//	this->device.getCommandPool(),
+	//	static_cast<uint32_t>(this->commandBuffers.size()),
+	//	this->commandBuffers.data()
+	//);
 	this->commandBuffers.clear();
 }
 auto Renderer::beginFrame() -> VkCommandBuffer {
