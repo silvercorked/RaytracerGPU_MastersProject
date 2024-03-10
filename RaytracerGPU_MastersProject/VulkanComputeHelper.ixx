@@ -52,7 +52,6 @@ export class VulkanComputeHelper {
 
 	// pickPhysicalDevice
 	//VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
-	VkPhysicalDeviceProperties properties;
 
 	// createLogicalDevice
 	Device device;
@@ -92,8 +91,7 @@ export class VulkanComputeHelper {
 	//VkCommandPool commandPool;
 
 	// createShaderStorageBuffers
-	std::vector<VkBuffer> shaderStorageBuffers;				// strictly 2 for this case. no swapchain so just the ones i need
-	std::vector<VkDeviceMemory> shaderStorageBuffersMemory;	// which are the prev and current
+	std::vector<std::unique_ptr<Buffer>> shaderStorageBuffers;
 
 	// createUniformBuffers
 	std::unique_ptr<Buffer> uniformBuffer;
@@ -166,7 +164,6 @@ export class VulkanComputeHelper {
 		VkBuffer&,
 		VkDeviceMemory&
 	) -> void;
-	auto copyBuffer(VkQueue, VkCommandPool, VkBuffer, VkBuffer, VkDeviceSize) -> void;
 
 	auto createUniformBuffers() -> void;
 
@@ -190,7 +187,7 @@ export class VulkanComputeHelper {
 		nUbo.height = static_cast<f32>(this->swapChainExtent.height);
 		this->uniformBuffer->writeToBuffer(&nUbo);
 		this->uniformBuffer->flush(); // make visible to device
-		std::cout << "doing iteration" << std::endl;
+		//std::cout << "doing iteration" << std::endl;
 
 		VkPipelineStageFlags computeStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
 		VkPipelineStageFlags transferStage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
@@ -212,13 +209,13 @@ export class VulkanComputeHelper {
 
 		vkWaitForFences(this->device.device(), 1, &this->computeInFlightFence, VK_TRUE, UINT64_MAX); // await compute completion
 
-		 { // fake 1 second delay
+		 /*{ // fake 1 second delay
 			auto currentTime = std::chrono::high_resolution_clock::now();
 			auto newTime = std::chrono::high_resolution_clock::now();
 			while (std::chrono::duration<float, std::chrono::milliseconds::period>(newTime - currentTime).count() < 250.0f)
 				newTime = std::chrono::high_resolution_clock::now();
 			std::cout << "waited 1 second probably" << std::endl;
-		}
+		}*/ 
 
 		this->presentToWindow(nextSwapChainIndex, this->computeFinishedSemaphore);
 
@@ -246,7 +243,7 @@ public:
 			auto newTime = std::chrono::high_resolution_clock::now();
 			float frameTime = std::chrono::duration<float, std::chrono::milliseconds::period>(newTime - currentTime).count();
 			currentTime = newTime;
-			std::cout << "Iteration Time: " << frameTime << std::endl;
+			//std::cout << "Iteration Time: " << frameTime << std::endl;
 			doIteration();
 		}
 		vkDeviceWaitIdle(this->device.device());
@@ -268,11 +265,6 @@ VulkanComputeHelper::~VulkanComputeHelper() {
 
 	vkDestroyDescriptorPool(this->device.device(), this->descriptorPool, nullptr);
 	vkDestroyDescriptorSetLayout(this->device.device(), this->computeDescriptorSetLayout, nullptr);
-
-	for (size_t i = 0; i < this->shaderStorageBuffers.size(); i++) {
-		vkDestroyBuffer(this->device.device(), this->shaderStorageBuffers[i], nullptr);
-		vkFreeMemory(this->device.device(), this->shaderStorageBuffersMemory[i], nullptr);
-	}
 
 	vkDestroySemaphore(this->device.device(), this->computeFinishedSemaphore, nullptr);
 	vkDestroyFence(this->device.device(), this->computeInFlightFence, nullptr);
@@ -552,44 +544,41 @@ auto VulkanComputeHelper::createShaderStorageBuffers() -> void {
 
 	std::vector<Logistic> points(SAMPLE_COUNT);
 	for (auto& point : points) {
-		point.r = 3.5f + (rndDist(rndEngine) / 2.0f);			// r: 3.5-4
+		point.r = (rndDist(rndEngine) * 4.0f);			// r: 3.5-4
 		point.x = rndDist(rndEngine);							// x: 0-1
 	}
 
-	VkDeviceSize bufferSize = sizeof(Logistic) * SAMPLE_COUNT;
+	VkDeviceSize logisticSize = sizeof(Logistic);
 
 	// Create Staging buffer to upload data to gpu
-	VkBuffer stagingBuffer;
-	VkDeviceMemory stagingBufferMemory;
-	this->createBuffer(
-		bufferSize,
+	Buffer stagingBuffer(
+		this->device,
+		logisticSize,
+		points.size(),
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-		stagingBuffer,
-		stagingBufferMemory
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
 	);
 
-	void* data;
-	vkMapMemory(this->device.device(), stagingBufferMemory, 0, bufferSize, 0, &data);
-	memcpy(data, points.data(), static_cast<size_t>(bufferSize));
-	vkUnmapMemory(this->device.device(), stagingBufferMemory);
+	stagingBuffer.map();
+	stagingBuffer.writeToBuffer((void*)points.data());
 
-	this->shaderStorageBuffers.resize(1);
-	this->shaderStorageBuffersMemory.resize(1);
-
-	this->createBuffer( // create ssbo buffers on the gpu that can be transfered to from the cpu
-		bufferSize,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT // is SSBO
-		| VK_BUFFER_USAGE_TRANSFER_DST_BIT // can transfer to from cpu
-		| VK_BUFFER_USAGE_TRANSFER_SRC_BIT, // can read from into cpu
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		this->shaderStorageBuffers[0],
-		this->shaderStorageBuffersMemory[0]
+	this->shaderStorageBuffers.push_back(
+		std::make_unique<Buffer>(
+			this->device,
+			logisticSize,
+			points.size(),
+			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+		)
 	);
-	this->copyBuffer(this->device.computeQueue(), this->device.getComputeCommandPool(), stagingBuffer, this->shaderStorageBuffers[0], bufferSize);
 
-	vkDestroyBuffer(this->device.device(), stagingBuffer, nullptr);
-	vkFreeMemory(this->device.device(), stagingBufferMemory, nullptr);
+	this->device.copyBuffer(
+		this->device.graphicsQueue(),
+		this->device.getGraphicsCommandPool(),
+		stagingBuffer.getBuffer(),
+		this->shaderStorageBuffers[this->shaderStorageBuffers.size() - 1]->getBuffer(),
+		logisticSize * SAMPLE_COUNT
+	);
 }
 auto VulkanComputeHelper::createBuffer(
 	VkDeviceSize size,
@@ -619,38 +608,6 @@ auto VulkanComputeHelper::createBuffer(
 		throw std::runtime_error("failed to allocate buffer memory!");
 
 	vkBindBufferMemory(this->device.device(), buffer, bufferMemory, 0);
-}
-auto VulkanComputeHelper::copyBuffer(VkQueue queue, VkCommandPool pool, VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) -> void {
-	VkCommandBufferAllocateInfo allocInfo{};
-	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	allocInfo.commandPool = pool;
-	allocInfo.commandBufferCount = 1;
-
-	VkCommandBuffer commandBuffer;
-	vkAllocateCommandBuffers(this->device.device(), &allocInfo, &commandBuffer);
-
-	VkCommandBufferBeginInfo beginInfo{};
-	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-	vkBeginCommandBuffer(commandBuffer, &beginInfo);
-
-	VkBufferCopy copyRegion{};
-	copyRegion.size = size;
-	vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
-
-	vkEndCommandBuffer(commandBuffer);
-
-	VkSubmitInfo submitInfo{};
-	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers = &commandBuffer;
-
-	vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE);
-    vkQueueWaitIdle(queue);
-
-    vkFreeCommandBuffers(this->device.device(), pool, 1, &commandBuffer);
 }
 
 auto VulkanComputeHelper::createUniformBuffers() -> void { // just 1
@@ -710,7 +667,7 @@ auto VulkanComputeHelper::createComputeDescriptorSets() -> void {
 		descriptorWrites[0].pBufferInfo = &uboBufferInfo;
 
 		VkDescriptorBufferInfo storageBufferInfo{};
-		storageBufferInfo.buffer = this->shaderStorageBuffers[0];
+		storageBufferInfo.buffer = this->shaderStorageBuffers[0]->getBuffer();
 		storageBufferInfo.offset = 0;
 		storageBufferInfo.range = sizeof(Logistic) * SAMPLE_COUNT;
 
@@ -795,6 +752,29 @@ void VulkanComputeHelper::recordComputeCommandBuffer(VkCommandBuffer commandBuff
 		0,
 		nullptr
 	);
+
+	VkImageMemoryBarrier reset;
+	reset.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	reset.pNext = nullptr;
+	reset.srcAccessMask = 0;
+	reset.dstAccessMask = 0;
+	reset.oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+	reset.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+	reset.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	reset.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	reset.image = this->swapChainImages[nextSwapChainIndex];
+	reset.subresourceRange = range;
+
+	vkCmdPipelineBarrier(
+		commandBuffer,
+		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, // src stage
+		VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, // dst stage
+		0, // no dependencies
+		0, nullptr, // no memory barriers
+		0, nullptr, // no buffer memory barriers
+		1, &reset // 1 imageMemoryBarrier
+	);
+
 
 	VkClearColorValue clearValue = { 0.0f, 0.0f, 0.0f, 1.0f };
 	vkCmdClearColorImage(
@@ -881,11 +861,6 @@ auto VulkanComputeHelper::presentToWindow(u32 swapChainImageIndex, VkSemaphore t
 		throw std::runtime_error("failed to present swapchain!");
 	}
 }
-
-
-
-
-
 
 // read computed result
 		/*{

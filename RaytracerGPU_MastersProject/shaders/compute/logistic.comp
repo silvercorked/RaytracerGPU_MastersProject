@@ -28,7 +28,7 @@ void main() {
 	logisticsIn[index].r = curr.r;
 	logisticsIn[index].x = curr.x * curr.r * (1.0f - curr.x);
 
-	int xCoord = int(((logisticsIn[index].r - 3.5) / 0.5) * ubo.width); // 3.5-4 range
+	int xCoord = int((logisticsIn[index].r / 4.0f) * ubo.width); // 3.5-4 range
 	int yCoord = int(((1 - logisticsIn[index].x) / 1.0) * ubo.height); // 0-1 range but need to turn it upside down as well
 
 	imageStore(outputImage, ivec2(xCoord, yCoord), ubo.pixelColor);
