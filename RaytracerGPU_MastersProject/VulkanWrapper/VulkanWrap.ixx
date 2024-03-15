@@ -5,7 +5,7 @@ export module VulkanWrap; // primary module interface unit
 
 export import :Buffer;
 //export import :Camera;
-//export import :Descriptors;
+export import :Descriptors;
 export import :Device;
 //export import :Model;
 //export import :GraphicsPipeline;

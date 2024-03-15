@@ -40,27 +40,16 @@ struct Logistic { // f(x; r) = xr(1-x)
 
 export class VulkanComputeHelper {
 	// createInstance
-	//VkInstance instance;
-	//const std::vector<const char*> validationLayers = { "VK_LAYER_KHRONOS_validation" };
 	
 	// setupDebugMessenger
-	//VkDebugUtilsMessengerEXT debugMessenger;
 
 	// createSurface
 	Window window;
-	//VkSurfaceKHR surface;
 
 	// pickPhysicalDevice
-	//VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
 
 	// createLogicalDevice
 	Device device;
-	//VkDevice device;
-	//const std::vector<const char*> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
-	//u32 GCQueueIndex;
-	//u32 PresentQueueIndex;
-	//VkQueue GCQueue; // graphics and compute queue
-	//VkQueue PresentQueue;
 
 	// createSwapChain
 	u32 currentSwapChainIndex = 0;
@@ -76,7 +65,7 @@ export class VulkanComputeHelper {
 	VkRenderPass renderPass;
 
 	// createComputeDescriptorSetLayout
-	VkDescriptorSetLayout computeDescriptorSetLayout;
+	std::unique_ptr<DescriptorSetLayout> computeDescriptorSetLayout;
 
 	// createComputePipeline
 	VkShaderModule computeShaderModule;
@@ -88,7 +77,6 @@ export class VulkanComputeHelper {
 	std::vector<VkFramebuffer> swapChainFrameBuffers;
 
 	// createCommandPool
-	//VkCommandPool commandPool;
 
 	// createShaderStorageBuffers
 	std::vector<std::unique_ptr<Buffer>> shaderStorageBuffers;
@@ -97,7 +85,7 @@ export class VulkanComputeHelper {
 	std::unique_ptr<Buffer> uniformBuffer;
 
 	// createDesciptorPool
-	VkDescriptorPool descriptorPool;
+	std::unique_ptr<DescriptorPool> descriptorPool;
 
 	// createComputeDescriptorSets
 	std::vector<VkDescriptorSet> computeDescriptorSets;
@@ -182,7 +170,7 @@ export class VulkanComputeHelper {
 
 		UniformBufferObject nUbo{};
 		nUbo.iteration = this->iteration;
-		nUbo.pixelColor = glm::vec4(1.0, 0.0, 0.0, 1.0);
+		nUbo.pixelColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
 		nUbo.width = static_cast<f32>(this->swapChainExtent.width);
 		nUbo.height = static_cast<f32>(this->swapChainExtent.height);
 		this->uniformBuffer->writeToBuffer(&nUbo);
@@ -205,7 +193,6 @@ export class VulkanComputeHelper {
 		if (vkQueueSubmit(this->device.computeQueue(), 1, &submitInfo, this->computeInFlightFence) != VK_SUCCESS) {
 			throw std::runtime_error("failed to submit compute command buffer!");
 		}
-		this->iteration++;
 
 		vkWaitForFences(this->device.device(), 1, &this->computeInFlightFence, VK_TRUE, UINT64_MAX); // await compute completion
 
@@ -245,6 +232,7 @@ public:
 			currentTime = newTime;
 			//std::cout << "Iteration Time: " << frameTime << std::endl;
 			doIteration();
+			this->iteration++;
 		}
 		vkDeviceWaitIdle(this->device.device());
 	}
@@ -262,19 +250,16 @@ VulkanComputeHelper::~VulkanComputeHelper() {
 	vkDestroyPipelineLayout(this->device.device(), computePipelineLayout, nullptr);
 
 	this->uniformBuffer = nullptr; // deconstruct uniformBuffer
+	for (int i = 0; i < this->shaderStorageBuffers.size(); i++)
+		this->shaderStorageBuffers[i] = nullptr; // deconstruct ssbos
+	this->computeDescriptorSetLayout = nullptr; // deconstruct descriptorSetLayout
+	// deconstruct descriptor set? maybe unneeded (no errors thrown so presuming can be deconstructed whenever)
+	this->descriptorPool = nullptr; // deconstruct descriptorPool
 
-	vkDestroyDescriptorPool(this->device.device(), this->descriptorPool, nullptr);
-	vkDestroyDescriptorSetLayout(this->device.device(), this->computeDescriptorSetLayout, nullptr);
 
 	vkDestroySemaphore(this->device.device(), this->computeFinishedSemaphore, nullptr);
 	vkDestroyFence(this->device.device(), this->computeInFlightFence, nullptr);
 
-	/* ~Device
-		vkDestroyCommandPool(this->device, this->commandPool, nullptr);
-		vkDestroyDevice(this->device, nullptr);
-		this->DestroyDebugUtilsMessengerEXT(this->instance, this->debugMessenger, nullptr);
-		vkDestroyInstance(this->instance, nullptr);
-	*/
 }
 
 auto VulkanComputeHelper::createSwapChain() -> void {
@@ -432,33 +417,23 @@ auto VulkanComputeHelper::createRenderPass() -> void {
 }
 
 auto VulkanComputeHelper::createComputeDescriptorSetLayout() -> void {
-	std::array<VkDescriptorSetLayoutBinding, 3> layoutBindings{};
-	layoutBindings[0].binding = 0;
-	layoutBindings[0].descriptorCount = 1;
-	layoutBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	layoutBindings[0].pImmutableSamplers = nullptr;
-	layoutBindings[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-
-	layoutBindings[1].binding = 1;
-	layoutBindings[1].descriptorCount = 1;
-	layoutBindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-	layoutBindings[1].pImmutableSamplers = nullptr;
-	layoutBindings[1].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-
-	layoutBindings[2].binding = 2;
-	layoutBindings[2].descriptorCount = 1;
-	layoutBindings[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-	layoutBindings[2].pImmutableSamplers = nullptr;
-	layoutBindings[2].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-
-	VkDescriptorSetLayoutCreateInfo layoutInfo{};
-	layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	layoutInfo.bindingCount = 3;
-	layoutInfo.pBindings = layoutBindings.data();
-
-	if (vkCreateDescriptorSetLayout(this->device.device(), &layoutInfo, nullptr, &this->computeDescriptorSetLayout) != VK_SUCCESS) {
-		throw std::runtime_error("failed to create compute descriptor set layout!");
-	}
+	this->computeDescriptorSetLayout = DescriptorSetLayout::Builder(this->device)
+		.addBinding(
+			0,
+			VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			VK_SHADER_STAGE_COMPUTE_BIT,
+			1
+		).addBinding(
+			1,
+			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+			VK_SHADER_STAGE_COMPUTE_BIT,
+			1
+		).addBinding(
+			2,
+			VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+			VK_SHADER_STAGE_COMPUTE_BIT,
+			1
+		).build();
 }
 
 auto VulkanComputeHelper::createComputePipeline() -> void {
@@ -472,10 +447,11 @@ auto VulkanComputeHelper::createComputePipeline() -> void {
 	this->computeShaderStageInfo.module = this->computeShaderModule;
 	this->computeShaderStageInfo.pName = "main"; // function name to invoke in compute shader. main is prob good to always stick too. least for me rn
 
+	VkDescriptorSetLayout tempCompute = this->computeDescriptorSetLayout->getDescriptorSetLayout();
 	VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	pipelineLayoutInfo.setLayoutCount = 1;
-	pipelineLayoutInfo.pSetLayouts = &this->computeDescriptorSetLayout;
+	pipelineLayoutInfo.pSetLayouts = &tempCompute;
 
 	if (vkCreatePipelineLayout(this->device.device(), &pipelineLayoutInfo, nullptr, &this->computePipelineLayout) != VK_SUCCESS)
 		throw std::runtime_error("failed to create compute pipeline layout!");
@@ -555,7 +531,7 @@ auto VulkanComputeHelper::createShaderStorageBuffers() -> void {
 		this->device,
 		logisticSize,
 		points.size(),
-		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		VK_BUFFER_USAGE_TRANSFER_SRC_BIT, // will transfer from
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
 	);
 
@@ -567,7 +543,7 @@ auto VulkanComputeHelper::createShaderStorageBuffers() -> void {
 			this->device,
 			logisticSize,
 			points.size(),
-			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, // is ssbo and will transfer into
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
 		)
 	);
@@ -623,76 +599,29 @@ auto VulkanComputeHelper::createUniformBuffers() -> void { // just 1
 }
 
 auto VulkanComputeHelper::createDescriptorPool() -> void {
-	std::array<VkDescriptorPoolSize, 3> poolSizes{};
-	poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	poolSizes[0].descriptorCount = static_cast<u32>(1);
-	poolSizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-	poolSizes[1].descriptorCount = static_cast<u32>(1);
-	poolSizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-	poolSizes[2].descriptorCount = static_cast<u32>(1);
-
-	VkDescriptorPoolCreateInfo poolInfo{};
-	poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	poolInfo.poolSizeCount = 3;
-	poolInfo.pPoolSizes = poolSizes.data();
-	poolInfo.maxSets = this->swapChainImageViews.size();
-
-	if (vkCreateDescriptorPool(this->device.device(), &poolInfo, nullptr, &this->descriptorPool) != VK_SUCCESS)
-		throw std::runtime_error("Failed to create descriptor pool!");
+	this->descriptorPool = DescriptorPool::Builder(this->device)
+		.setMaxSets(this->swapChainImageViews.size())
+		.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1)
+		.addPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1)
+		.addPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1)
+		.build();
 }
 
 auto VulkanComputeHelper::createComputeDescriptorSets() -> void {
-	std::vector<VkDescriptorSetLayout> layouts(this->swapChainImageViews.size(), this->computeDescriptorSetLayout);
-	VkDescriptorSetAllocateInfo allocInfo{};
-	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-	allocInfo.descriptorPool = this->descriptorPool;
-	allocInfo.descriptorSetCount = static_cast<u32>(this->swapChainImageViews.size());
-	allocInfo.pSetLayouts = layouts.data();
-
 	this->computeDescriptorSets.resize(this->swapChainImageViews.size());
-	VkResult res = vkAllocateDescriptorSets(this->device.device(), &allocInfo, this->computeDescriptorSets.data());
-	if (res != VK_SUCCESS) {
-		throw std::runtime_error("Failed to allocate descriptor sets!");
-	}
-
-	for (size_t i = 0; i < this->swapChainImageViews.size(); i++) {
-		VkDescriptorBufferInfo uboBufferInfo = this->uniformBuffer->descriptorInfo();
-		std::array<VkWriteDescriptorSet, 3> descriptorWrites{};
-		descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		descriptorWrites[0].dstSet = this->computeDescriptorSets[i];
-		descriptorWrites[0].dstBinding = 0;
-		descriptorWrites[0].dstArrayElement = 0;
-		descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		descriptorWrites[0].descriptorCount = 1;
-		descriptorWrites[0].pBufferInfo = &uboBufferInfo;
-
-		VkDescriptorBufferInfo storageBufferInfo{};
-		storageBufferInfo.buffer = this->shaderStorageBuffers[0]->getBuffer();
-		storageBufferInfo.offset = 0;
-		storageBufferInfo.range = sizeof(Logistic) * SAMPLE_COUNT;
-
-		descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		descriptorWrites[1].dstSet = this->computeDescriptorSets[i];
-		descriptorWrites[1].dstBinding = 1;
-		descriptorWrites[1].dstArrayElement = 0;
-		descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-		descriptorWrites[1].descriptorCount = 1;
-		descriptorWrites[1].pBufferInfo = &storageBufferInfo;
-
-		VkDescriptorImageInfo descImageInfo{};
+	auto uboBufferInfo = this->uniformBuffer->descriptorInfo(); // use same ubo for each frame cause data is const, so dont need more than one
+	auto ssboBufferInfo = this->shaderStorageBuffers[0]->descriptorInfo(); // use same ssbo for each frame
+	for (i32 i = 0; i < this->computeDescriptorSets.size(); i++) {
+		VkDescriptorImageInfo descImageInfo{}; // each image points to a different image on the swapchain, so need a couple
 		descImageInfo.sampler = nullptr;
 		descImageInfo.imageView = this->swapChainImageViews[i];
 		descImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
-		descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		descriptorWrites[2].dstSet = this->computeDescriptorSets[i];
-		descriptorWrites[2].dstBinding = 2;
-		descriptorWrites[2].dstArrayElement = 0;
-		descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-		descriptorWrites[2].descriptorCount = 1;
-		descriptorWrites[2].pImageInfo = &descImageInfo;
-
-		vkUpdateDescriptorSets(this->device.device(), 3, descriptorWrites.data(), 0, nullptr);
+		DescriptorWriter(*this->computeDescriptorSetLayout, *this->descriptorPool)
+			.writeBuffer(0, &uboBufferInfo)
+			.writeBuffer(1, &ssboBufferInfo)
+			.writeImage(2, &descImageInfo)
+			.build(this->computeDescriptorSets[i]);
 	}
 }
 
