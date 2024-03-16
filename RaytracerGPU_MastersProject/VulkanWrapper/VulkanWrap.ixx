@@ -10,7 +10,7 @@ export import :Device;
 //export import :Model;
 //export import :GraphicsPipeline;
 //export import :Renderer;
-//export import :SwapChain;
+export import :SwapChain;
 export import :Window;
 
 export import :Utils;
