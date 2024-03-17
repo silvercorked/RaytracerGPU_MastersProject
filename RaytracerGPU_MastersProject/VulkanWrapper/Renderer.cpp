@@ -3,6 +3,7 @@
 #include <GLFW/glfw3.h>
 
 #include <cassert>
+#include <array>
 
 module VulkanWrap:Renderer;
 

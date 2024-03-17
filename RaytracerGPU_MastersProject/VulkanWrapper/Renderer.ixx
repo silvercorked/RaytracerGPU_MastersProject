@@ -15,7 +15,6 @@ import :SwapChain;
 
 import <vector>;
 import <memory>;
-import <array>;
 import <stdexcept>;
 
 /*

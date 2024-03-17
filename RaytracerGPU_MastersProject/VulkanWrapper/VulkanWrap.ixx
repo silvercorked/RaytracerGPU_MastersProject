@@ -8,7 +8,7 @@ export import :Buffer;
 export import :Descriptors;
 export import :Device;
 //export import :Model;
-//export import :GraphicsPipeline;
+export import :GraphicsPipeline;
 export import :ComputePipeline;
 //export import :Renderer;
 export import :SwapChain;

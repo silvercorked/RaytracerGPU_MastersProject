@@ -3,12 +3,12 @@
 #include <vulkan/vulkan.h>
 
 #include <algorithm>
+#include <array>
 
 module VulkanWrap:SwapChain;
 
 // std lib headers
 import <string>;
-import <array>;
 import <cstring>;
 import <iostream>;
 import <limits>;
@@ -35,7 +35,7 @@ void SwapChain::init() {
     this->createSwapChain();
     this->createImageViews();
     this->createRenderPass();
-    //this->createDepthResources(); // skipping depth resources. prob don't need them
+    this->createDepthResources(); // skipping depth resources. prob don't need them
     this->createFramebuffers();
     this->createSyncObjects();
 }
@@ -102,7 +102,7 @@ VkResult SwapChain::submitCommandBuffers(
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
     VkSemaphore waitSemaphores[] = { this->imageAvailableSemaphores[this->currentFrame] };
-    VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT }; // VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT 
+    VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
     submitInfo.waitSemaphoreCount = 1;
     submitInfo.pWaitSemaphores = waitSemaphores;
     submitInfo.pWaitDstStageMask = waitStages;
@@ -115,7 +115,7 @@ VkResult SwapChain::submitCommandBuffers(
     submitInfo.pSignalSemaphores = signalSemaphores;
 
     vkResetFences(this->device.device(), 1, &this->inFlightFences[this->currentFrame]);
-    if (vkQueueSubmit(this->device.computeQueue(), 1, &submitInfo, this->inFlightFences[this->currentFrame]) != VK_SUCCESS) { // this->device.graphicsQueue(), all render is done in compute, so swap out queue to submit to
+    if (vkQueueSubmit(this->device.graphicsQueue(), 1, &submitInfo, this->inFlightFences[this->currentFrame]) != VK_SUCCESS) { // this->device.graphicsQueue(), all render is done in compute, so swap out queue to submit to
         throw std::runtime_error("failed to submit draw command buffer!");
     }
 
@@ -160,7 +160,7 @@ void SwapChain::createSwapChain() {
     createInfo.imageColorSpace = surfaceFormat.colorSpace;
     createInfo.imageExtent = extent;
     createInfo.imageArrayLayers = 1;
-    createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT; // needed to put these images in ssbo for compute write
+    createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT; // needed to put these images in ssbo for compute write
 
     QueueFamilyIndices indices = this->device.findPhysicalQueueFamilies();
     uint32_t queueFamilyIndices[] = { indices.graphicsFamily, indices.presentFamily };
@@ -231,7 +231,6 @@ void SwapChain::createImageViews() {
 }
 
 void SwapChain::createRenderPass() {
-    /* for depth images
     VkAttachmentDescription depthAttachment{};
     depthAttachment.format = this->findDepthFormat();
     depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -245,7 +244,6 @@ void SwapChain::createRenderPass() {
     VkAttachmentReference depthAttachmentRef{};
     depthAttachmentRef.attachment = 1;
     depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-    */
 
     VkAttachmentDescription colorAttachment = {};
     colorAttachment.format = this->getSwapChainImageFormat();
@@ -259,30 +257,30 @@ void SwapChain::createRenderPass() {
 
     VkAttachmentReference colorAttachmentRef = {};
     colorAttachmentRef.attachment = 0;
-    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_GENERAL; // layout described in descriptor sets
+    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
     VkSubpassDescription subpass = {};
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpass.colorAttachmentCount = 1;
     subpass.pColorAttachments = &colorAttachmentRef;
-    //subpass.pDepthStencilAttachment = &depthAttachmentRef;
+    subpass.pDepthStencilAttachment = &depthAttachmentRef;
 
     VkSubpassDependency dependency = {};
     dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
     dependency.srcAccessMask = 0;
     dependency.srcStageMask =
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT; // | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
     dependency.dstSubpass = 0;
     dependency.dstStageMask =
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT; // | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
     dependency.dstAccessMask =
-        VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT; // | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
-    //std::array<VkAttachmentDescription, 2> attachments = { colorAttachment, depthAttachment };
+    std::array<VkAttachmentDescription, 2> attachments = { colorAttachment, depthAttachment };
     VkRenderPassCreateInfo renderPassInfo = {};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    renderPassInfo.attachmentCount = 1; //static_cast<uint32_t>(attachments.size());
-    renderPassInfo.pAttachments = &colorAttachment; // attachments.data();
+    renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+    renderPassInfo.pAttachments = attachments.data();
     renderPassInfo.subpassCount = 1;
     renderPassInfo.pSubpasses = &subpass;
     renderPassInfo.dependencyCount = 1;
@@ -296,8 +294,9 @@ void SwapChain::createRenderPass() {
 void SwapChain::createFramebuffers() {
     this->swapChainFramebuffers.resize(imageCount());
     for (size_t i = 0; i < imageCount(); i++) {
-        std::array<VkImageView, 1> attachments = { this->swapChainImageViews[i] }; // this->depthImageViews[i]
-
+        std::array<VkImageView, 2> attachments = { this->swapChainImageViews[i], this->depthImageViews[i] };
+        attachments[0] = this->swapChainImageViews[i];
+        attachments[1] = this->depthImageViews[i];
         VkExtent2D swapChainExtent = getSwapChainExtent();
         VkFramebufferCreateInfo framebufferInfo = {};
         framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;

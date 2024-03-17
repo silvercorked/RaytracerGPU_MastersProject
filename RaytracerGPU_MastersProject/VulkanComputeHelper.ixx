@@ -47,10 +47,21 @@ export class VulkanComputeHelper {
 
 	// createComputeDescriptorSetLayout
 	std::unique_ptr<DescriptorSetLayout> computeDescriptorSetLayout;
+	std::unique_ptr<DescriptorSetLayout> graphicsDescriptorSetLayout;
 
 	// createComputePipeline
 	std::unique_ptr<ComputePipeline> computePipeline;
 	VkPipelineLayout computePipelineLayout;
+
+	// createComputeImage
+	VkImage computeImage;
+	VkImageView computeImageView;
+	VkDeviceMemory computeImageMemory;
+	VkSampler fragmentShaderImageSampler;
+
+	// createGraphicsPipeline
+	std::unique_ptr<GraphicsPipeline> graphicsPipeline;
+	VkPipelineLayout graphicsPipelineLayout;
 
 	// createShaderStorageBuffers
 	std::vector<std::unique_ptr<Buffer>> shaderStorageBuffers;
@@ -60,13 +71,17 @@ export class VulkanComputeHelper {
 
 	// createDesciptorPool
 	std::unique_ptr<DescriptorPool> descriptorPool;
+	std::unique_ptr<DescriptorPool> graphicsDescriptorPool;
 
 	// createComputeDescriptorSets
 	std::vector<VkDescriptorSet> computeDescriptorSets;
+	std::vector<VkDescriptorSet> graphicsDescriptorSets;
 
 	// createComputeCommandBuffers
 	std::vector<VkCommandBuffer> computeCommandBuffers;
-	std::vector<VkCommandBuffer> transferCommandBuffers;
+	VkCommandBuffer graphicsCommandBuffer;
+
+	VkFence computeComplete;
 
 	// mainLoop -> doIteration
 	u32 iteration;
@@ -88,48 +103,59 @@ export class VulkanComputeHelper {
 			this->createFrameBuffers();
 		*/
 		this->createComputeDescriptorSetLayout();
+		this->createGraphicsDescriptorSetLayout();
 		this->createComputePipelineLayout();
 		this->createComputePipeline();
+		this->createComputeImage();
+		this->createGraphicsPipeline();
 		
 		this->createUniformBuffers();			// in ubo
 		this->createShaderStorageBuffers();		// in ssbo
-		this->createDescriptorPool();
+		
+		this->createComputeDescriptorPool();
 		this->createComputeDescriptorSets();
+		this->createGraphicsDescriptorPool();
+		this->createGraphicsDescriptorSets();
+		
 		this->createComputeCommandBuffers();
+		this->createGraphicsCommandBuffers();
 	}
 
 	auto createSwapChain() -> void;
 
 	auto createComputeDescriptorSetLayout() -> void;
+	auto createGraphicsDescriptorSetLayout() -> void;
 
 	auto createComputePipelineLayout() -> void;
 	auto createComputePipeline() -> void;
 
+	auto createComputeImage() -> void;
+
+	auto createGraphicsPipeline() -> void;
+
 	auto createShaderStorageBuffers() -> void;
-	auto createBuffer(
-		VkDeviceSize,
-		VkBufferUsageFlags,
-		VkMemoryPropertyFlags,
-		VkBuffer&,
-		VkDeviceMemory&
-	) -> void;
 
 	auto createUniformBuffers() -> void;
 
-	auto createDescriptorPool() -> void;
+	auto createComputeDescriptorPool() -> void;
 
 	auto createComputeDescriptorSets() -> void;
 
+	auto createGraphicsDescriptorPool() -> void;
+	auto createGraphicsDescriptorSets() -> void;
+
 	auto createComputeCommandBuffers() -> void;
+	auto createGraphicsCommandBuffers() -> void;
 
 	auto doIteration() -> void {
 		// fences are for syncing cpu and gpu. semaphores are for specifying the order of gpu tasks
-		u32 imageIndex = this->getNextImageIndex(); // signals imageReadySemaphore
+		u32 imageIndex = this->getNextImageIndex(); // await graphics completion
 		u32 frameIndex = imageIndex % SwapChain::MAX_FRAMES_IN_FLIGHT;
 		// number of frames currently rendering and number of images in swap chain are not the same
 		// imageIndex = index of image in swapchain
 		// frameIndex = index of frame in flight (ie, set of buffers to use to direct gpu)
 		this->recordComputeCommandBuffer(this->computeCommandBuffers[frameIndex], imageIndex);
+		this->recordGraphicsCommandBuffer(this->graphicsCommandBuffer, imageIndex);
 
 		UniformBufferObject nUbo{};
 		nUbo.iteration = this->iteration;
@@ -150,10 +176,28 @@ export class VulkanComputeHelper {
 		}
 		*/
 
-		this->swapChain->submitCommandBuffers(&this->computeCommandBuffers[frameIndex], &imageIndex);
+		VkSubmitInfo submitInfo = {};
+		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+		VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+		submitInfo.waitSemaphoreCount = 0;
+		submitInfo.pWaitSemaphores = nullptr;
+		submitInfo.pWaitDstStageMask = waitStages;
+
+		submitInfo.commandBufferCount = 1;
+		submitInfo.pCommandBuffers = &this->computeCommandBuffers[frameIndex];
+
+		vkResetFences(this->device.device(), 1, &this->computeComplete);
+		if (vkQueueSubmit(this->device.computeQueue(), 1, &submitInfo, this->computeComplete) != VK_SUCCESS)
+			throw std::runtime_error("failed to submit compute command buffer!");
+
+		vkWaitForFences(this->device.device(), 1, &this->computeComplete, VK_TRUE, UINT64_MAX);
+
+		this->swapChain->submitCommandBuffers(&this->graphicsCommandBuffer, &imageIndex);
 	}
 
 	auto recordComputeCommandBuffer(VkCommandBuffer, u32) -> void;
+	auto recordGraphicsCommandBuffer(VkCommandBuffer, u32) -> void;
 	auto beginRenderPass(VkCommandBuffer, u32) -> void;
 	auto endRenderPass(VkCommandBuffer) -> void;
 
@@ -163,6 +207,13 @@ public:
 	VulkanComputeHelper();
 	auto mainLoop() -> void {
 		auto currentTime = std::chrono::high_resolution_clock::now();
+
+		VkFenceCreateInfo fenceInfo{};
+		fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+		fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+		if (vkCreateFence(this->device.device(), &fenceInfo, nullptr, &this->computeComplete) != VK_SUCCESS)
+			throw std::runtime_error("failed to create fence");
+
 		while (!this->window.shouldClose()) {
 			glfwPollEvents();
 			//if (this->iteration > 0) break;
@@ -186,7 +237,17 @@ VulkanComputeHelper::VulkanComputeHelper() :
 }
 VulkanComputeHelper::~VulkanComputeHelper() {
 	this->computePipeline = nullptr;
-	vkDestroyPipelineLayout(this->device.device(), computePipelineLayout, nullptr);
+	vkDestroyPipelineLayout(this->device.device(), this->computePipelineLayout, nullptr);
+
+	this->graphicsPipeline = nullptr;
+	vkDestroyPipelineLayout(this->device.device(), this->graphicsPipelineLayout, nullptr);
+
+	vkDestroyImage(this->device.device(), this->computeImage, nullptr);
+	vkDestroyImageView(this->device.device(), this->computeImageView, nullptr);
+	vkDestroySampler(this->device.device(), this->fragmentShaderImageSampler, nullptr);
+	vkFreeMemory(this->device.device(), this->computeImageMemory, nullptr);
+
+	vkDestroyFence(this->device.device(), this->computeComplete, nullptr);
 
 	this->uniformBuffer = nullptr; // deconstruct uniformBuffer
 	for (int i = 0; i < this->shaderStorageBuffers.size(); i++)
@@ -229,6 +290,15 @@ auto VulkanComputeHelper::createComputeDescriptorSetLayout() -> void {
 			1
 		).build();
 }
+auto VulkanComputeHelper::createGraphicsDescriptorSetLayout() -> void {
+	this->graphicsDescriptorSetLayout = DescriptorSetLayout::Builder(this->device)
+		.addBinding(
+			0,
+			VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			VK_SHADER_STAGE_FRAGMENT_BIT,
+			1
+		).build();
+}
 
 auto VulkanComputeHelper::createComputePipelineLayout() -> void {
 	VkDescriptorSetLayout tempCompute = this->computeDescriptorSetLayout->getDescriptorSetLayout();
@@ -247,6 +317,86 @@ auto VulkanComputeHelper::createComputePipeline() -> void {
 	this->computePipeline = std::make_unique<ComputePipeline>(
 		this->device,
 		"shaders/compiled/logistic.comp.spv",
+		pipelineConfig
+	);
+}
+
+auto VulkanComputeHelper::createComputeImage() -> void {
+	VkImageCreateInfo imageInfo{};
+	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	imageInfo.imageType = VK_IMAGE_TYPE_2D;
+	imageInfo.extent.width = this->swapChain->getSwapChainExtent().width;
+	imageInfo.extent.height = this->swapChain->getSwapChainExtent().height;
+	imageInfo.extent.depth = 1;
+	imageInfo.mipLevels = 1;
+	imageInfo.arrayLayers = 1;
+	imageInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+	imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+	imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+	imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	imageInfo.flags = 0;
+
+	this->device.createImageWithInfo(
+		imageInfo,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		this->computeImage,
+		this->computeImageMemory
+	);
+
+	VkImageViewCreateInfo viewInfo{};
+	viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	viewInfo.image = this->computeImage;
+	viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	viewInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+	viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	viewInfo.subresourceRange.baseMipLevel = 0;
+	viewInfo.subresourceRange.levelCount = 1;
+	viewInfo.subresourceRange.baseArrayLayer = 0;
+	viewInfo.subresourceRange.layerCount = 1;
+
+	if (vkCreateImageView(this->device.device(), &viewInfo, nullptr, &this->computeImageView) != VK_SUCCESS) {
+		throw std::runtime_error("failed to create texture image view!");
+	}
+
+	VkSamplerCreateInfo samplerInfo{};
+	samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+	samplerInfo.magFilter = VK_FILTER_LINEAR;
+	samplerInfo.minFilter = VK_FILTER_LINEAR;
+	samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+	samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	samplerInfo.addressModeV = samplerInfo.addressModeU;
+	samplerInfo.addressModeW = samplerInfo.addressModeU;
+	samplerInfo.mipLodBias = 0.0f;
+	samplerInfo.maxAnisotropy = 1.0f;
+	samplerInfo.minLod = 0.0f;
+	samplerInfo.maxLod = 1.0f;
+	samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+
+	if (vkCreateSampler(this->device.device(), &samplerInfo, nullptr, &this->fragmentShaderImageSampler) != VK_SUCCESS) {
+		std::runtime_error("failed to create image sampler");
+	}
+}
+
+auto VulkanComputeHelper::createGraphicsPipeline() -> void {
+	VkDescriptorSetLayout tempGraphics = this->graphicsDescriptorSetLayout->getDescriptorSetLayout();
+	VkPipelineLayoutCreateInfo layoutCreateInfo{};
+	layoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	layoutCreateInfo.setLayoutCount = 1;
+	layoutCreateInfo.pSetLayouts = &tempGraphics;
+	if (vkCreatePipelineLayout(this->device.device(), &layoutCreateInfo, nullptr, &this->graphicsPipelineLayout) != VK_SUCCESS)
+		throw std::runtime_error("Failed to create graphics pipeline layout!");
+	GraphicsPipelineConfigInfo pipelineConfig{};
+	GraphicsPipeline::defaultPipelineConfigInfo(pipelineConfig);
+	pipelineConfig.renderPass = this->swapChain->getRenderPass();
+	pipelineConfig.rasterizationInfo.cullMode = VK_CULL_MODE_FRONT_BIT;
+	pipelineConfig.rasterizationInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+	pipelineConfig.pipelineLayout = this->graphicsPipelineLayout;
+	this->graphicsPipeline = std::make_unique<GraphicsPipeline>(
+		this->device,
+		"shaders/compiled/SingleTriangleFullScreen.vert.spv",
+		"shaders/compiled/SingleTriangleFullScreen.frag.spv",
 		pipelineConfig
 	);
 }
@@ -294,35 +444,6 @@ auto VulkanComputeHelper::createShaderStorageBuffers() -> void {
 		logisticSize * SAMPLE_COUNT
 	);
 }
-auto VulkanComputeHelper::createBuffer(
-	VkDeviceSize size,
-	VkBufferUsageFlags usage,
-	VkMemoryPropertyFlags properties,
-	VkBuffer& buffer,
-	VkDeviceMemory& bufferMemory
-) -> void {
-	VkBufferCreateInfo bufferInfo{};
-	bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	bufferInfo.size = size;
-	bufferInfo.usage = usage;
-	bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-	if (vkCreateBuffer(this->device.device(), &bufferInfo, nullptr, &buffer) != VK_SUCCESS)
-		throw std::runtime_error("failed to create buffer!");
-
-	VkMemoryRequirements memRequirements;
-	vkGetBufferMemoryRequirements(this->device.device(), buffer, &memRequirements);
-
-	VkMemoryAllocateInfo allocInfo{};
-	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	allocInfo.allocationSize = memRequirements.size;
-	allocInfo.memoryTypeIndex = this->device.findMemoryType(memRequirements.memoryTypeBits, properties);
-
-	if (vkAllocateMemory(this->device.device(), &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS)
-		throw std::runtime_error("failed to allocate buffer memory!");
-
-	vkBindBufferMemory(this->device.device(), buffer, bufferMemory, 0);
-}
 
 auto VulkanComputeHelper::createUniformBuffers() -> void { // just 1
 	VkDeviceSize bufferSize = sizeof(UniformBufferObject);
@@ -336,9 +457,9 @@ auto VulkanComputeHelper::createUniformBuffers() -> void { // just 1
 	this->uniformBuffer->map();
 }
 
-auto VulkanComputeHelper::createDescriptorPool() -> void {
+auto VulkanComputeHelper::createComputeDescriptorPool() -> void {
 	this->descriptorPool = DescriptorPool::Builder(this->device)
-		.setMaxSets(this->swapChain->imageCount()) // need one per swap chain image
+		.setMaxSets(1)
 		.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1)
 		.addPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1)
 		.addPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1)
@@ -346,21 +467,37 @@ auto VulkanComputeHelper::createDescriptorPool() -> void {
 }
 
 auto VulkanComputeHelper::createComputeDescriptorSets() -> void {
-	this->computeDescriptorSets.resize(this->swapChain->imageCount());
+	this->computeDescriptorSets.resize(1);
 	auto uboBufferInfo = this->uniformBuffer->descriptorInfo(); // use same ubo for each frame cause data is const, so dont need more than one
 	auto ssboBufferInfo = this->shaderStorageBuffers[0]->descriptorInfo(); // use same ssbo for each frame
-	for (i32 i = 0; i < this->computeDescriptorSets.size(); i++) {
-		VkDescriptorImageInfo descImageInfo{}; // each image points to a different image on the swapchain, so need a couple
-		descImageInfo.sampler = nullptr;
-		descImageInfo.imageView = this->swapChain->getImageView(i); // one descriptor set per swapchain image
-		descImageInfo.imageLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
-		DescriptorWriter(*this->computeDescriptorSetLayout, *this->descriptorPool)
-			.writeBuffer(0, &uboBufferInfo)
-			.writeBuffer(1, &ssboBufferInfo)
-			.writeImage(2, &descImageInfo)
-			.build(this->computeDescriptorSets[i]);
-	}
+	VkDescriptorImageInfo descImageInfo{};
+	descImageInfo.sampler = nullptr;
+	descImageInfo.imageView = this->computeImageView;
+	descImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+	DescriptorWriter(*this->computeDescriptorSetLayout, *this->descriptorPool)
+		.writeBuffer(0, &uboBufferInfo)
+		.writeBuffer(1, &ssboBufferInfo)
+		.writeImage(2, &descImageInfo)
+		.build(this->computeDescriptorSets[0]);
+}
+auto VulkanComputeHelper::createGraphicsDescriptorPool() -> void {
+	this->graphicsDescriptorPool = DescriptorPool::Builder(this->device)
+		.setMaxSets(1)
+		.addPoolSize(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1)
+		.build();
+}
+auto VulkanComputeHelper::createGraphicsDescriptorSets() -> void {
+	this->graphicsDescriptorSets.resize(1);
+	VkDescriptorImageInfo descImageInfo{};
+	descImageInfo.sampler = this->fragmentShaderImageSampler;
+	descImageInfo.imageView = this->computeImageView;
+	descImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	DescriptorWriter(*this->graphicsDescriptorSetLayout, *this->graphicsDescriptorPool)
+		.writeImage(0, &descImageInfo)
+		.build(this->graphicsDescriptorSets[0]);
 }
 
 auto VulkanComputeHelper::createComputeCommandBuffers() -> void {
@@ -374,8 +511,19 @@ auto VulkanComputeHelper::createComputeCommandBuffers() -> void {
 	if (vkAllocateCommandBuffers(this->device.device(), &allocInfo, this->computeCommandBuffers.data()) != VK_SUCCESS)
 		throw std::runtime_error("Failed to allocate compute Command Buffers!");
 }
+auto VulkanComputeHelper::createGraphicsCommandBuffers() -> void {
+	VkCommandBufferAllocateInfo allocInfo{};
+	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	allocInfo.commandPool = this->device.getGraphicsCommandPool();
+	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	allocInfo.commandBufferCount = 1;
+
+	if (vkAllocateCommandBuffers(this->device.device(), &allocInfo, &this->graphicsCommandBuffer) != VK_SUCCESS)
+		throw std::runtime_error("Failed to allocate compute Command Buffers!");
+}
 
 void VulkanComputeHelper::recordComputeCommandBuffer(VkCommandBuffer commandBuffer, u32 nextSwapChainIndex) {
+	static bool firstRun = true;
 	VkCommandBufferBeginInfo beginInfo{};
 	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
@@ -391,17 +539,17 @@ void VulkanComputeHelper::recordComputeCommandBuffer(VkCommandBuffer commandBuff
 	}
 
 	
-	/*
+	
 	VkImageMemoryBarrier reset;
 	reset.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 	reset.pNext = nullptr;
 	reset.srcAccessMask = 0;
 	reset.dstAccessMask = 0;
-	reset.oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-	reset.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+	reset.oldLayout = firstRun ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	reset.newLayout = VK_IMAGE_LAYOUT_GENERAL;
 	reset.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	reset.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	reset.image = this->swapChain->getImage(nextSwapChainIndex);
+	reset.image = this->computeImage;
 	reset.subresourceRange = range;
 
 	vkCmdPipelineBarrier(
@@ -413,15 +561,17 @@ void VulkanComputeHelper::recordComputeCommandBuffer(VkCommandBuffer commandBuff
 		0, nullptr, // no buffer memory barriers
 		1, &reset // 1 imageMemoryBarrier
 	);
+	
 
 
 	VkClearColorValue clearValue = { 0.0f, 0.0f, 0.0f, 1.0f };
 	vkCmdClearColorImage(
-		commandBuffer, this->swapChain->getImage(nextSwapChainIndex),
-		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clearValue, 1, &range
+		commandBuffer, this->computeImage,
+		VK_IMAGE_LAYOUT_GENERAL, &clearValue, 1, &range
 	);
 	
 	
+	/*
 	VkImageMemoryBarrier swapChainToCompute;
 	swapChainToCompute.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 	swapChainToCompute.pNext = nullptr;
@@ -446,12 +596,6 @@ void VulkanComputeHelper::recordComputeCommandBuffer(VkCommandBuffer commandBuff
 	);
 	*/
 	
-	
-	this->beginRenderPass(commandBuffer, nextSwapChainIndex);
-
-	this->endRenderPass(commandBuffer); // clears image
-	
-	
 	this->computePipeline->bind(commandBuffer);
 	vkCmdBindDescriptorSets(
 		commandBuffer,
@@ -459,23 +603,22 @@ void VulkanComputeHelper::recordComputeCommandBuffer(VkCommandBuffer commandBuff
 		this->computePipelineLayout,
 		0,
 		1,
-		&this->computeDescriptorSets[nextSwapChainIndex],
+		&this->computeDescriptorSets[0],
 		0,
 		nullptr
 	);
 	vkCmdDispatch(commandBuffer, SAMPLE_COUNT / KERNEL_SIZE, 1, 1);
 
-	/*
 	VkImageMemoryBarrier computeToPresent;
 	computeToPresent.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 	computeToPresent.pNext = nullptr;
 	computeToPresent.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
 	computeToPresent.dstAccessMask = 0;
 	computeToPresent.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
-	computeToPresent.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+	computeToPresent.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	computeToPresent.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	computeToPresent.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	computeToPresent.image = this->swapChain->getImage(nextSwapChainIndex);
+	computeToPresent.image = this->computeImage;
 	computeToPresent.subresourceRange = range;
 
 	vkCmdPipelineBarrier(
@@ -487,8 +630,37 @@ void VulkanComputeHelper::recordComputeCommandBuffer(VkCommandBuffer commandBuff
 		0, nullptr, // no buffer memory barriers
 		1, &computeToPresent // 1 imageMemoryBarrier
 	);
-	*/
 	
+	if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
+		throw std::runtime_error("failed to record compute command buffer!");
+	}
+	firstRun = false;
+}
+auto VulkanComputeHelper::recordGraphicsCommandBuffer(VkCommandBuffer commandBuffer, u32 currImageIndex) -> void {
+	VkCommandBufferBeginInfo beginInfo{};
+	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
+		throw std::runtime_error("failed to begin recording graphics command buffer!");
+	}
+
+	this->graphicsPipeline->bind(commandBuffer);
+	vkCmdBindDescriptorSets(
+		commandBuffer,
+		VK_PIPELINE_BIND_POINT_GRAPHICS,
+		this->graphicsPipelineLayout,
+		0,
+		1,
+		&this->graphicsDescriptorSets[0],
+		0,
+		nullptr
+	);
+
+	this->beginRenderPass(commandBuffer, currImageIndex);
+	
+	vkCmdDraw(commandBuffer, 3, 1, 0, 0); // vertex shader just needs 3 vertex indexes to make space for fragment shader, so lie and say there's 3 to do even though there's none sent
+
+	this->endRenderPass(commandBuffer);
+
 	if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
 		throw std::runtime_error("failed to record compute command buffer!");
 	}
@@ -498,13 +670,13 @@ auto VulkanComputeHelper::beginRenderPass(VkCommandBuffer commandBuffer, u32 cur
 	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 	renderPassInfo.renderPass = this->swapChain->getRenderPass();
 	renderPassInfo.framebuffer = this->swapChain->getFrameBuffer(currImageIndex);
-	// no depth so just color part
 	renderPassInfo.renderArea.offset = { 0, 0 };
 	renderPassInfo.renderArea.extent = this->swapChain->getSwapChainExtent();
 	
-	std::array<VkClearValue, 1> clearValues{};
+	std::array<VkClearValue, 2> clearValues{};
 	clearValues[0].color = { 0.01f, 0.01f, 0.01f, 1.0f };
-	renderPassInfo.clearValueCount = 1;
+	clearValues[1].depthStencil = { 1.0f, 0 };
+	renderPassInfo.clearValueCount = 2;
 	renderPassInfo.pClearValues = clearValues.data();
 
 	vkCmdBeginRenderPass(

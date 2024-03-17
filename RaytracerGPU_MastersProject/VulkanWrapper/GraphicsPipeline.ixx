@@ -8,7 +8,7 @@ module;
 export module VulkanWrap:GraphicsPipeline;
 
 import :Device;
-import :Model;
+//import :Model;
 import :Pipeline;
 
 import <string>;
@@ -17,7 +17,7 @@ import <fstream>;
 import <stdexcept>;
 import <iostream>;
 
-struct GraphicsPipelineConfigInfo {
+export struct GraphicsPipelineConfigInfo {
 
 	GraphicsPipelineConfigInfo() = default;
 

@@ -61,10 +61,18 @@ auto GraphicsPipeline::createGraphicsPipeline(
 	auto& attributeDescriptions = config.attributeDescriptions;
 	VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
 	vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-	vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
-	vertexInputInfo.vertexBindingDescriptionCount = static_cast<uint32_t>(bindingDescriptions.size());
-	vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
-	vertexInputInfo.pVertexBindingDescriptions = bindingDescriptions.data();
+	if (bindingDescriptions.size() == 0 && attributeDescriptions.size() == 0) { // assume trying to make fullscreen single triangle
+		vertexInputInfo.vertexAttributeDescriptionCount = 0;
+		vertexInputInfo.vertexBindingDescriptionCount = 0;
+		vertexInputInfo.pVertexAttributeDescriptions = nullptr;
+		vertexInputInfo.pVertexBindingDescriptions = nullptr;
+	}
+	else {
+		vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
+		vertexInputInfo.vertexBindingDescriptionCount = static_cast<uint32_t>(bindingDescriptions.size());
+		vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
+		vertexInputInfo.pVertexBindingDescriptions = bindingDescriptions.data();
+	}
 
 	// create pipeline object and connect to config
 	VkGraphicsPipelineCreateInfo pipelineInfo{};
@@ -176,8 +184,8 @@ auto GraphicsPipeline::defaultPipelineConfigInfo(GraphicsPipelineConfigInfo& con
 	configInfo.dynamicStateInfo.dynamicStateCount = static_cast<uint32_t>(configInfo.dynamicStateEnables.size());
 	configInfo.dynamicStateInfo.flags = 0;
 
-	configInfo.bindingDescriptions = Model::Vertex::getBindingDescriptions();
-	configInfo.attributeDescriptions = Model::Vertex::getAttributeDescriptions();
+	//configInfo.bindingDescriptions = Model::Vertex::getBindingDescriptions();
+	//configInfo.attributeDescriptions = Model::Vertex::getAttributeDescriptions();
 }
 auto GraphicsPipeline::enableAlphaBlending(GraphicsPipelineConfigInfo& configInfo) -> void {
 	configInfo.colorBlendAttachement.blendEnable = VK_TRUE;
