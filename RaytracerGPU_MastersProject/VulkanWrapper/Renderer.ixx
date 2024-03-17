@@ -7,6 +7,8 @@ module;
 
 export module VulkanWrap:Renderer;
 
+import PrimitiveTypes;
+
 import :Device;
 import :Window;
 import :SwapChain;
@@ -25,8 +27,8 @@ export class Renderer {
 	std::unique_ptr<SwapChain> swapChain;
 	std::vector<VkCommandBuffer> commandBuffers;
 
-	uint32_t currentImageIndex{ 0 };
-	int currentFrameIndex{ 0 };
+	u32 currentImageIndex{ 0 };
+	i32 currentFrameIndex{ 0 };
 	bool isFrameStarted{ false };
 
 	auto createCommandBuffers() -> void;
@@ -52,7 +54,7 @@ public:
 	auto getSwapChainRenderPass() const -> VkRenderPass {
 		return this->swapChain->getRenderPass();
 	}
-	auto getAspectRatio() const -> float {
+	auto getAspectRatio() const -> f32 {
 		return this->swapChain->extentAspectRatio();
 	}
 	auto isFrameInProgress() const -> bool {

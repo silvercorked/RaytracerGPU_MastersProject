@@ -44,31 +44,13 @@ export class VulkanComputeHelper {
 
 	// createSwapChain
 	std::unique_ptr<SwapChain> swapChain;
-	//u32 currentSwapChainIndex = 0;
-	//VkSwapchainKHR swapChain;
-	//std::vector<VkImage> swapChainImages;
-	//VkFormat swapChainImageFormat;
-	//VkExtent2D swapChainExtent;
-	
-	// createImageViews
-	//std::vector<VkImageView> swapChainImageViews;
-
-	// createRenderPass
-	//VkRenderPass renderPass;
 
 	// createComputeDescriptorSetLayout
 	std::unique_ptr<DescriptorSetLayout> computeDescriptorSetLayout;
 
 	// createComputePipeline
-	VkShaderModule computeShaderModule;
-	VkPipelineShaderStageCreateInfo computeShaderStageInfo;
-	VkPipeline computePipeline;
+	std::unique_ptr<ComputePipeline> computePipeline;
 	VkPipelineLayout computePipelineLayout;
-
-	// createFrameBuffers
-	//std::vector<VkFramebuffer> swapChainFrameBuffers;
-
-	// createCommandPool
 
 	// createShaderStorageBuffers
 	std::vector<std::unique_ptr<Buffer>> shaderStorageBuffers;
@@ -86,12 +68,6 @@ export class VulkanComputeHelper {
 	std::vector<VkCommandBuffer> computeCommandBuffers;
 	std::vector<VkCommandBuffer> transferCommandBuffers;
 
-	// createSyncObjects
-	VkSemaphore computeFinishedSemaphore;
-	VkFence computeInFlightFence;
-	VkSemaphore transferDoneSemaphore;
-	VkSemaphore imageReadySemaphore;
-
 	// mainLoop -> doIteration
 	u32 iteration;
 
@@ -104,38 +80,30 @@ export class VulkanComputeHelper {
 			this->createLogicalDevice();
 			this->createCommandPool();
 		*/
+		// SwapChain
 		this->createSwapChain();
-		//this->createImageViews();				// out image
-		//this->createRenderPass();
+		/*
+			this->createImageViews();
+			this->createRenderPass();
+			this->createFrameBuffers();
+		*/
 		this->createComputeDescriptorSetLayout();
+		this->createComputePipelineLayout();
 		this->createComputePipeline();
-		//this->createFrameBuffers();
 		
 		this->createUniformBuffers();			// in ubo
 		this->createShaderStorageBuffers();		// in ssbo
 		this->createDescriptorPool();
 		this->createComputeDescriptorSets();
 		this->createComputeCommandBuffers();
-		this->createSyncObjects();
-
 	}
 
 	auto createSwapChain() -> void;
-	auto chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) -> VkSurfaceFormatKHR;
-	auto chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes) -> VkPresentModeKHR;
-	auto chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities) -> VkExtent2D;
-
-	auto createImageViews() -> void;
-
-	auto createRenderPass() -> void;
 
 	auto createComputeDescriptorSetLayout() -> void;
 
+	auto createComputePipelineLayout() -> void;
 	auto createComputePipeline() -> void;
-	auto createShaderModule(const std::vector<char>&) -> VkShaderModule;
-	auto readFile(const std::string&) -> std::vector<char>;
-
-	auto createFrameBuffers() -> void;
 
 	auto createShaderStorageBuffers() -> void;
 	auto createBuffer(
@@ -154,8 +122,6 @@ export class VulkanComputeHelper {
 
 	auto createComputeCommandBuffers() -> void;
 
-	auto createSyncObjects() -> void;
-
 	auto doIteration() -> void {
 		// fences are for syncing cpu and gpu. semaphores are for specifying the order of gpu tasks
 		u32 imageIndex = this->getNextImageIndex(); // signals imageReadySemaphore
@@ -164,7 +130,6 @@ export class VulkanComputeHelper {
 		// imageIndex = index of image in swapchain
 		// frameIndex = index of frame in flight (ie, set of buffers to use to direct gpu)
 		this->recordComputeCommandBuffer(this->computeCommandBuffers[frameIndex], imageIndex);
-		vkResetFences(this->device.device(), 1, &this->computeInFlightFence); // reset for next run
 
 		UniformBufferObject nUbo{};
 		nUbo.iteration = this->iteration;
@@ -179,10 +144,10 @@ export class VulkanComputeHelper {
 	}
 
 	auto recordComputeCommandBuffer(VkCommandBuffer, u32) -> void;
+	auto beginRenderPass(VkCommandBuffer, u32) -> void;
+	auto endRenderPass(VkCommandBuffer) -> void;
 
 	auto getNextImageIndex() -> u32;
-
-	auto presentToWindow(u32 swapChainImageIndex, VkSemaphore toWaitOn) -> void;
 
 public:
 	VulkanComputeHelper();
@@ -204,13 +169,13 @@ public:
 };
 
 VulkanComputeHelper::VulkanComputeHelper() :
-	window{1920, 1080, "Compute-based Images"},
-	device{window}
+	window{ 1920, 1080, "Compute-based Images" },
+	device{ window }
 {
 	this->initVulkan();
 }
 VulkanComputeHelper::~VulkanComputeHelper() {
-	vkDestroyPipeline(this->device.device(), computePipeline, nullptr);
+	this->computePipeline = nullptr;
 	vkDestroyPipelineLayout(this->device.device(), computePipelineLayout, nullptr);
 
 	this->uniformBuffer = nullptr; // deconstruct uniformBuffer
@@ -219,11 +184,6 @@ VulkanComputeHelper::~VulkanComputeHelper() {
 	this->computeDescriptorSetLayout = nullptr; // deconstruct descriptorSetLayout
 	// deconstruct descriptor set? maybe unneeded (no errors thrown so presuming can be deconstructed whenever)
 	this->descriptorPool = nullptr; // deconstruct descriptorPool
-
-
-	vkDestroySemaphore(this->device.device(), this->computeFinishedSemaphore, nullptr);
-	vkDestroyFence(this->device.device(), this->computeInFlightFence, nullptr);
-
 }
 
 auto VulkanComputeHelper::createSwapChain() -> void {
@@ -260,17 +220,7 @@ auto VulkanComputeHelper::createComputeDescriptorSetLayout() -> void {
 		).build();
 }
 
-auto VulkanComputeHelper::createComputePipeline() -> void {
-	auto computeShaderCode = readFile("shaders/compiled/logistic.comp.spv");
-
-	this->computeShaderModule = this->createShaderModule(computeShaderCode);
-
-	this->computeShaderStageInfo = {};
-	this->computeShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	this->computeShaderStageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-	this->computeShaderStageInfo.module = this->computeShaderModule;
-	this->computeShaderStageInfo.pName = "main"; // function name to invoke in compute shader. main is prob good to always stick too. least for me rn
-
+auto VulkanComputeHelper::createComputePipelineLayout() -> void {
 	VkDescriptorSetLayout tempCompute = this->computeDescriptorSetLayout->getDescriptorSetLayout();
 	VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -279,40 +229,16 @@ auto VulkanComputeHelper::createComputePipeline() -> void {
 
 	if (vkCreatePipelineLayout(this->device.device(), &pipelineLayoutInfo, nullptr, &this->computePipelineLayout) != VK_SUCCESS)
 		throw std::runtime_error("failed to create compute pipeline layout!");
-
-	VkComputePipelineCreateInfo pipelineInfo{};
-	pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-	pipelineInfo.layout = this->computePipelineLayout;
-	pipelineInfo.stage = this->computeShaderStageInfo;
-
-	if (vkCreateComputePipelines(this->device.device(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &this->computePipeline) != VK_SUCCESS)
-		throw std::runtime_error("failed to create compute pipeline!");
-
-	vkDestroyShaderModule(this->device.device(), this->computeShaderModule, nullptr);
 }
-auto VulkanComputeHelper::createShaderModule(const std::vector<char>& code) -> VkShaderModule {
-	VkShaderModuleCreateInfo createInfo{};
-	createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-	createInfo.codeSize = code.size();
-	createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
-	VkShaderModule shaderModule;
-	if (vkCreateShaderModule(this->device.device(), &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
-		throw std::runtime_error("failed to create shader module!");
-	}
-	return shaderModule;
-}
-auto VulkanComputeHelper::readFile(const std::string& filepath) -> std::vector<char> { // needs <fstream>
-	std::ifstream file{ filepath, std::ios::ate | std::ios::binary }; // jump to end and as binary
-	if (!file.is_open()) {
-		throw std::runtime_error("Failed to open file: " + filepath);
-	}
-	size_t fileSize = static_cast<size_t>(file.tellg());
-	std::vector<char> buffer(fileSize);
-
-	file.seekg(0);
-	file.read(buffer.data(), fileSize);
-	file.close();
-	return buffer;
+auto VulkanComputeHelper::createComputePipeline() -> void {
+	ComputePipelineConfigInfo pipelineConfig{};
+	ComputePipeline::defaultPipelineConfigInfo(pipelineConfig);
+	pipelineConfig.pipelineLayout = this->computePipelineLayout;
+	this->computePipeline = std::make_unique<ComputePipeline>(
+		this->device,
+		"shaders/compiled/logistic.comp.spv",
+		pipelineConfig
+	);
 }
 
 auto VulkanComputeHelper::createShaderStorageBuffers() -> void {
@@ -439,23 +365,6 @@ auto VulkanComputeHelper::createComputeCommandBuffers() -> void {
 		throw std::runtime_error("Failed to allocate compute Command Buffers!");
 }
 
-auto VulkanComputeHelper::createSyncObjects() -> void {
-	VkSemaphoreCreateInfo semaphoreInfo{};
-	semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-
-	VkFenceCreateInfo fenceInfo{};
-	fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-	fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-
-	if (
-		vkCreateSemaphore(this->device.device(), &semaphoreInfo, nullptr, &this->computeFinishedSemaphore) != VK_SUCCESS
-		|| vkCreateFence(this->device.device(), &fenceInfo, nullptr, &computeInFlightFence) != VK_SUCCESS
-		|| vkCreateSemaphore(this->device.device(), &semaphoreInfo, nullptr, &this->imageReadySemaphore) != VK_SUCCESS
-		|| vkCreateSemaphore(this->device.device(), &semaphoreInfo, nullptr, &this->transferDoneSemaphore) != VK_SUCCESS
-	)
-		throw std::runtime_error("Failed to create compute synchronization object!");
-}
-
 void VulkanComputeHelper::recordComputeCommandBuffer(VkCommandBuffer commandBuffer, u32 nextSwapChainIndex) {
 	VkCommandBufferBeginInfo beginInfo{};
 	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -471,7 +380,7 @@ void VulkanComputeHelper::recordComputeCommandBuffer(VkCommandBuffer commandBuff
 		throw std::runtime_error("failed to begin recording compute command buffer!");
 	}
 
-	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, this->computePipeline);
+	this->computePipeline->bind(commandBuffer);
 
 	vkCmdBindDescriptorSets(
 		commandBuffer,
@@ -563,6 +472,40 @@ void VulkanComputeHelper::recordComputeCommandBuffer(VkCommandBuffer commandBuff
 		throw std::runtime_error("failed to record compute command buffer!");
 	}
 }
+auto VulkanComputeHelper::beginRenderPass(VkCommandBuffer commandBuffer, u32 currImageIndex) -> void {
+	VkRenderPassBeginInfo renderPassInfo{};
+	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+	renderPassInfo.renderPass = this->swapChain->getRenderPass();
+	renderPassInfo.framebuffer = this->swapChain->getFrameBuffer(currImageIndex);
+	// no depth so just color part
+	renderPassInfo.renderArea.offset = { 0, 0 };
+	renderPassInfo.renderArea.extent = this->swapChain->getSwapChainExtent();
+	
+	std::array<VkClearValue, 1> clearValues{};
+	clearValues[0].color = { 0.01f, 0.01f, 0.01f, 1.0f };
+	renderPassInfo.clearValueCount = 1;
+	renderPassInfo.pClearValues = clearValues.data();
+
+	vkCmdBeginRenderPass(
+		commandBuffer,
+		&renderPassInfo,
+		VK_SUBPASS_CONTENTS_INLINE
+	);
+
+	VkViewport viewport{};
+	viewport.x = 0.0f;
+	viewport.y = 0.0f;
+	viewport.width = static_cast<float>(this->swapChain->getSwapChainExtent().width);
+	viewport.height = static_cast<float>(this->swapChain->getSwapChainExtent().height);
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+	VkRect2D scissor{ {0, 0}, this->swapChain->getSwapChainExtent() };
+	vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+	vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+}
+auto VulkanComputeHelper::endRenderPass(VkCommandBuffer commandBuffer) -> void {
+	vkCmdEndRenderPass(commandBuffer);
+}
 auto VulkanComputeHelper::getNextImageIndex() -> u32 {
 	u32 nextImageIndex;
 	if (
@@ -570,22 +513,6 @@ auto VulkanComputeHelper::getNextImageIndex() -> u32 {
 	)
 		throw std::runtime_error("failed to acquire next image!");
 	return nextImageIndex;
-}
-auto VulkanComputeHelper::presentToWindow(u32 swapChainImageIndex, VkSemaphore toWaitOn) -> void {
-	/*
-	VkPresentInfoKHR presentInfo{};
-	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-	presentInfo.pNext = nullptr;
-	presentInfo.waitSemaphoreCount = 1;
-	presentInfo.pWaitSemaphores = &toWaitOn;
-	presentInfo.swapchainCount = 1;
-	presentInfo.pSwapchains = &this->swapChain;
-	presentInfo.pImageIndices = &swapChainImageIndex;
-
-	if (vkQueuePresentKHR(this->device.presentQueue(), &presentInfo) != VK_SUCCESS) {
-		throw std::runtime_error("failed to present swapchain!");
-	}
-	*/
 }
 
 // read computed result

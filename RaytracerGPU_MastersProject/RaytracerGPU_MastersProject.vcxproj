@@ -151,6 +151,8 @@
     <ClCompile Include="VulkanComputeHelper.ixx" />
     <ClCompile Include="VulkanWrapper\Camera.cpp" />
     <ClCompile Include="VulkanWrapper\Camera.ixx" />
+    <ClCompile Include="VulkanWrapper\ComputePipeline.cpp" />
+    <ClCompile Include="VulkanWrapper\ComputePipeline.ixx" />
     <ClCompile Include="VulkanWrapper\Descriptors.cpp" />
     <ClCompile Include="VulkanWrapper\Descriptors.ixx" />
     <ClCompile Include="VulkanWrapper\Device.cpp" />
@@ -171,6 +173,8 @@
   <ItemGroup>
     <None Include="compile.bat" />
     <None Include="shaders\compute\logistic.comp" />
+    <None Include="shaders\fragment\SingleTriangleFullScreen.frag" />
+    <None Include="shaders\vertex\SingleTriangleFullScreen.vert" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="Plan.txt" />

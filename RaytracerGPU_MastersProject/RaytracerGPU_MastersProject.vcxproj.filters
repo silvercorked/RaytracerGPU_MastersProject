@@ -99,12 +99,20 @@
     <ClCompile Include="VulkanWrapper\abstract\Pipeline.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="VulkanWrapper\ComputePipeline.ixx">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="VulkanWrapper\ComputePipeline.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\compute\logistic.comp" />
     <None Include="compile.bat">
       <Filter>Source Files</Filter>
     </None>
+    <None Include="shaders\vertex\SingleTriangleFullScreen.vert" />
+    <None Include="shaders\fragment\SingleTriangleFullScreen.frag" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="Plan.txt" />
