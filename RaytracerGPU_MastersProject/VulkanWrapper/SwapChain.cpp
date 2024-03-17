@@ -77,7 +77,8 @@ VkResult SwapChain::acquireNextImage(uint32_t* imageIndex) {
         1,
         &this->inFlightFences[this->currentFrame],
         VK_TRUE,
-        std::numeric_limits<uint64_t>::max());
+        std::numeric_limits<uint64_t>::max()
+    );
 
     VkResult result = vkAcquireNextImageKHR(
         this->device.device(),

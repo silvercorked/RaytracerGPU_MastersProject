@@ -38,7 +38,7 @@ export class SwapChain {
     size_t currentFrame = 0;
 
 public:
-    static constexpr int MAX_FRAMES_IN_FLIGHT = 2;
+    static constexpr int MAX_FRAMES_IN_FLIGHT = 1;
 
     SwapChain(Device& deviceRef, VkExtent2D windowExtent);
     SwapChain(Device& deviceRef, VkExtent2D windowExtent, std::shared_ptr<SwapChain> previous);

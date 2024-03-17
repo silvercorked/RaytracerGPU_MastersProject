@@ -140,6 +140,16 @@ export class VulkanComputeHelper {
 		this->uniformBuffer->flush(); // make visible to device
 		//std::cout << "doing iteration" << std::endl;
 
+		/*
+		{ // fake 1 second delay
+			auto currentTime = std::chrono::high_resolution_clock::now();
+			auto newTime = std::chrono::high_resolution_clock::now();
+			while (std::chrono::duration<float, std::chrono::milliseconds::period>(newTime - currentTime).count() < 1000.0f)
+				newTime = std::chrono::high_resolution_clock::now();
+			std::cout << "waited 1 second probably" << std::endl;
+		}
+		*/
+
 		this->swapChain->submitCommandBuffers(&this->computeCommandBuffers[frameIndex], &imageIndex);
 	}
 
@@ -343,7 +353,7 @@ auto VulkanComputeHelper::createComputeDescriptorSets() -> void {
 		VkDescriptorImageInfo descImageInfo{}; // each image points to a different image on the swapchain, so need a couple
 		descImageInfo.sampler = nullptr;
 		descImageInfo.imageView = this->swapChain->getImageView(i); // one descriptor set per swapchain image
-		descImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+		descImageInfo.imageLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
 		DescriptorWriter(*this->computeDescriptorSetLayout, *this->descriptorPool)
 			.writeBuffer(0, &uboBufferInfo)
@@ -380,19 +390,8 @@ void VulkanComputeHelper::recordComputeCommandBuffer(VkCommandBuffer commandBuff
 		throw std::runtime_error("failed to begin recording compute command buffer!");
 	}
 
-	this->computePipeline->bind(commandBuffer);
-
-	vkCmdBindDescriptorSets(
-		commandBuffer,
-		VK_PIPELINE_BIND_POINT_COMPUTE,
-		this->computePipelineLayout,
-		0,
-		1,
-		&this->computeDescriptorSets[nextSwapChainIndex],
-		0,
-		nullptr
-	);
-
+	
+	/*
 	VkImageMemoryBarrier reset;
 	reset.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 	reset.pNext = nullptr;
@@ -421,18 +420,20 @@ void VulkanComputeHelper::recordComputeCommandBuffer(VkCommandBuffer commandBuff
 		commandBuffer, this->swapChain->getImage(nextSwapChainIndex),
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clearValue, 1, &range
 	);
-
+	
+	
 	VkImageMemoryBarrier swapChainToCompute;
 	swapChainToCompute.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 	swapChainToCompute.pNext = nullptr;
 	swapChainToCompute.srcAccessMask = 0;
-	swapChainToCompute.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+	swapChainToCompute.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
 	swapChainToCompute.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 	swapChainToCompute.newLayout = VK_IMAGE_LAYOUT_GENERAL;
 	swapChainToCompute.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	swapChainToCompute.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	swapChainToCompute.image = this->swapChain->getImage(nextSwapChainIndex);
 	swapChainToCompute.subresourceRange = range;
+	
 
 	vkCmdPipelineBarrier(
 		commandBuffer,
@@ -443,20 +444,39 @@ void VulkanComputeHelper::recordComputeCommandBuffer(VkCommandBuffer commandBuff
 		0, nullptr, // no buffer memory barriers
 		1, &swapChainToCompute // 1 imageMemoryBarrier
 	);
+	*/
 	
+	
+	this->beginRenderPass(commandBuffer, nextSwapChainIndex);
+
+	this->endRenderPass(commandBuffer); // clears image
+	
+	
+	this->computePipeline->bind(commandBuffer);
+	vkCmdBindDescriptorSets(
+		commandBuffer,
+		VK_PIPELINE_BIND_POINT_COMPUTE,
+		this->computePipelineLayout,
+		0,
+		1,
+		&this->computeDescriptorSets[nextSwapChainIndex],
+		0,
+		nullptr
+	);
 	vkCmdDispatch(commandBuffer, SAMPLE_COUNT / KERNEL_SIZE, 1, 1);
 
-	VkImageMemoryBarrier computeToTransfer;
-	computeToTransfer.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-	computeToTransfer.pNext = nullptr;
-	computeToTransfer.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-	computeToTransfer.dstAccessMask = 0;
-	computeToTransfer.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
-	computeToTransfer.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-	computeToTransfer.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	computeToTransfer.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	computeToTransfer.image = this->swapChain->getImage(nextSwapChainIndex);
-	computeToTransfer.subresourceRange = range;
+	/*
+	VkImageMemoryBarrier computeToPresent;
+	computeToPresent.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	computeToPresent.pNext = nullptr;
+	computeToPresent.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+	computeToPresent.dstAccessMask = 0;
+	computeToPresent.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+	computeToPresent.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+	computeToPresent.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	computeToPresent.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	computeToPresent.image = this->swapChain->getImage(nextSwapChainIndex);
+	computeToPresent.subresourceRange = range;
 
 	vkCmdPipelineBarrier(
 		commandBuffer,
@@ -465,9 +485,10 @@ void VulkanComputeHelper::recordComputeCommandBuffer(VkCommandBuffer commandBuff
 		0, // no dependencies
 		0, nullptr, // no memory barriers
 		0, nullptr, // no buffer memory barriers
-		1, &computeToTransfer // 1 imageMemoryBarrier
+		1, &computeToPresent // 1 imageMemoryBarrier
 	);
-
+	*/
+	
 	if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
 		throw std::runtime_error("failed to record compute command buffer!");
 	}
