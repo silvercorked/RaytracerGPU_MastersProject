@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -163,6 +163,8 @@
     <ClCompile Include="VulkanWrapper\GraphicsPipeline.ixx" />
     <ClCompile Include="VulkanWrapper\Renderer.cpp" />
     <ClCompile Include="VulkanWrapper\Renderer.ixx" />
+    <ClCompile Include="VulkanWrapper\Scene.cpp" />
+    <ClCompile Include="VulkanWrapper\Scene.ixx" />
     <ClCompile Include="VulkanWrapper\SwapChain.cpp" />
     <ClCompile Include="VulkanWrapper\SwapChain.ixx" />
     <ClCompile Include="VulkanWrapper\Utils.ixx" />
@@ -173,7 +175,11 @@
   <ItemGroup>
     <None Include="compile.bat" />
     <None Include="shaders\compute\logistic.comp" />
+    <None Include="shaders\compute\ModelSpaceToWorldSpace.comp" />
+    <None Include="shaders\compute\raytrace.comp" />
     <None Include="shaders\fragment\SingleTriangleFullScreen.frag" />
+    <None Include="shaders\include\definitions.glsl" />
+    <None Include="shaders\include\random.glsl" />
     <None Include="shaders\vertex\SingleTriangleFullScreen.vert" />
   </ItemGroup>
   <ItemGroup>

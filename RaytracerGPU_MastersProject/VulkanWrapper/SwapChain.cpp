@@ -35,7 +35,7 @@ void SwapChain::init() {
     this->createSwapChain();
     this->createImageViews();
     this->createRenderPass();
-    this->createDepthResources(); // skipping depth resources. prob don't need them
+    this->createDepthResources();
     this->createFramebuffers();
     this->createSyncObjects();
 }

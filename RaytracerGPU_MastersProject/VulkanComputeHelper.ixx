@@ -41,6 +41,7 @@ struct Logistic { // f(x; r) = xr(1-x)
 export class VulkanComputeHelper {
 	Window window;
 	Device device;
+	//Renderer renderer{ window, device };
 
 	// createSwapChain
 	std::unique_ptr<SwapChain> swapChain;
@@ -538,8 +539,6 @@ void VulkanComputeHelper::recordComputeCommandBuffer(VkCommandBuffer commandBuff
 		throw std::runtime_error("failed to begin recording compute command buffer!");
 	}
 
-	
-	
 	VkImageMemoryBarrier reset;
 	reset.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 	reset.pNext = nullptr;

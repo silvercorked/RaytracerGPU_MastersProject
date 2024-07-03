@@ -39,11 +39,11 @@ export class Model {
 	uint32_t indexCount;					// and avoids copying vertex data to form each triangle
 
 	/*
-		v1 ______ v2/v4
+	 v1 ______ v2/v4
 		|   /|
 		|  / |
 		| /  |
-	v3/v5 |/___| v6
+  v3/v5 |/___| v6
 		vertexBuffer (no indexbuffer) = {v1, v2, v3, v4, v5, v6}
 
 		vertexBuffer (w/ indexbuffer) = {v1, v2, v3, v6}

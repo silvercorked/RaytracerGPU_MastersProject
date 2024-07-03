@@ -113,6 +113,9 @@
     </None>
     <None Include="shaders\vertex\SingleTriangleFullScreen.vert" />
     <None Include="shaders\fragment\SingleTriangleFullScreen.frag" />
+    <None Include="shaders\compute\raytrace.comp" />
+    <None Include="shaders\include\definitions.glsl" />
+    <None Include="shaders\include\random.glsl" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="Plan.txt" />
