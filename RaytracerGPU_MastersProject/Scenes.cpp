@@ -118,7 +118,7 @@ auto cornellMixedScene(std::unique_ptr<RaytraceScene>& scene) -> void {
 	std::shared_ptr<RTModel> quadGreen = loadModel("models/quad.obj", glm::vec3(0.1f, 1.0f, 0.1f));
 	std::shared_ptr<RTModel> quadBlue = loadModel("models/quad.obj", glm::vec3(0.1f, 0.1f, 1.0f));
 	std::shared_ptr<RTModel> quadWhite = loadModel("models/quad.obj", glm::vec3(1.0f, 1.0f, 1.0f));
-	std::shared_ptr<RTModel> vase = loadModel("models/smooth_vase.obj", glm::vec3(0.5f, 0, 0));
+	std::shared_ptr<RTModel> vase = loadModel("models/smooth_vase.obj", glm::vec3(1.0f, 0.1f, 1.0f));
 	std::shared_ptr<RTModel> cubeWhite = loadModel("models/cube.obj", glm::vec3(1.0f, 1.0f, 1.0f));
 	SceneTypes::GPU::Material sphereMat{};
 	sphereMat.albedo = { 1.0f, 1.0f, 1.0f };
@@ -156,9 +156,9 @@ auto cornellMixedScene(std::unique_ptr<RaytraceScene>& scene) -> void {
 
 	auto vaseGO = GameObject::createGameObject();
 	vaseGO.setModel(vase, true);
-	vaseGO.transform.translation = { 1.0f, 0.0f, 5.0f };
-	vaseGO.transform.scale = { 1.0f, 1.0f, 1.0f };
-	vaseGO.transform.rotation = { 0.0f, 0.0f, 0.0f };
+	vaseGO.transform.translation = { 4.0f, 0.0f, 10.0f };
+	vaseGO.transform.scale = { 5.0f, 5.0f, 5.0f };
+	vaseGO.transform.rotation = { glm::pi<f32>(), 0.0f, 0.0f };
 
 	auto sphere = GameObject::createGameObject();
 	sphere.setModel(loadModel(0.5f, sphereMat), false);
@@ -171,7 +171,7 @@ auto cornellMixedScene(std::unique_ptr<RaytraceScene>& scene) -> void {
 	scene->addGameObject(std::move(rightWall));
 	scene->addGameObject(std::move(roof));
 	scene->addGameObject(std::move(backWall));
-	//scene->addGameObject(std::move(vaseGO));
+	scene->addGameObject(std::move(vaseGO));
 	scene->addGameObject(std::move(sphere));
 
 	auto cube = GameObject::createGameObject();
