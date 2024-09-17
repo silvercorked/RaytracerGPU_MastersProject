@@ -1,7 +1,13 @@
 
 // from https://github.com/grigoryoskin/vulkan-compute-ray-tracing/blob/master/resources/shaders/source/include/random.glsl
 
+/*
+	If included, including file must contain a uniform buffer object called ubo with a currentSample uint property
+*/
+
 const float pi = 3.1415926535897932385;
+
+uint rngState = (600 * gl_GlobalInvocationID.x + gl_GlobalInvocationID.y) * (ubo.randomState + 1);
 
 // random implementation follows implementation of pcg32i_random_t, with inc = 1
 uint stepRNG(uint rngState) {
@@ -16,7 +22,6 @@ float stepAndOutputRNGFloat(inout uint rngState) {
 	return float(word) / 4294967295.0f;
 }
 
-uint rngState = (600 * gl_GlobalInvlocationID.x + gl_GlobalInvocationID.y) * (ubo.currentSample + 1);
 float random() {
 	return stepAndOutputRNGFloat(rngState);
 }

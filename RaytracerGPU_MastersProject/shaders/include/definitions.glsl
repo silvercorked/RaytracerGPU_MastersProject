@@ -1,31 +1,35 @@
 
-struct Model {
+// structs representing items from cpu memory (via ssbo or uniform or other buffer)
+// will use vec4 instead of vec3, as vec3 seems induces lots of weird alignment cases
+// purely shader side elements will still use vec3s
+
+struct Model { // cpu side
 	mat4 modelMatrix;
 };
 
-struct Material {
+struct Material { // cpu side
+	vec4 albedo;
 	uint materialType;
-	vec3 albedo;
 };
 
-struct Triangle {
-	vec3 v0;
-	vec3 v1;
-	vec3 v2;
+struct Triangle { // cpu side
+	vec4 v0;
+	vec4 v1;
+	vec4 v2;
 	uint materialIndex;
 	uint modelIndex;
 };
 
-struct Sphere {
-	vec3 center;
+struct Sphere { // cpu side
+	vec4 center;
 	float radius;
 	uint materialIndex;
 	uint modelIndex;
 };
 
 struct Light {
-	uint triangleIndex;
 	float area;
+	uint triangleIndex;
 };
 
 struct Ray {
@@ -41,8 +45,8 @@ struct HitRecord {
 	int backFaceInt; // bool as int
 	//float scatterPdf;
 	//float samplePdf;
-	vec3 u;
-	vec3 v;
+	float u;
+	float v;
 };
 
 #define LIGHT_MATERIAL 0

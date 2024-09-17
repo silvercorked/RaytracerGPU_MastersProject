@@ -1,15 +1,13 @@
-module;
+#pragma once
 
-// WIN32_LEAN_AND_MEAN // may want this later
+#include "PrimitiveTypes.hpp"
+
+#define WIN32_LEAN_AND_MEAN // may want this later
 #include <Windows.h>
 
-export module Bitmap;
+#include <string>
 
-import <string>;
-
-import PrimitiveTypes;
-
-export class Bitmap {
+class Bitmap {
     HBITMAP bmp;
     HDC hdc;
     HPEN pen;

@@ -1,14 +1,10 @@
-module;
+#pragma once
 
 #define GLM_FORCE_RADIANS					// functions expect radians, not degrees
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE			// Depth buffer values will range from 0 to 1, not -1 to 1
 #include <glm/glm.hpp>
 
-export module VulkanWrap:Camera;
-
-import <limits>;
-
-export class Camera {
+class Camera {
 	glm::mat4 projectionMatrix{ 1.0f };
 	glm::mat4 viewMatrix{ 1.0f };
 	glm::mat4 inverseViewMatrix{ 1.0f };
@@ -25,4 +21,5 @@ public:
 	auto getView() const -> const glm::mat4& { return this->viewMatrix; }
 	auto getInverseView() const -> const glm::mat4& { return this->inverseViewMatrix; }
 	auto getPosition() const -> const glm::vec3 { return glm::vec3(this->inverseViewMatrix[3]); }
+	auto getDirection() const -> const glm::vec3 { return glm::vec3(this->inverseViewMatrix[2]); } // i think this works
 };

@@ -1,11 +1,8 @@
 
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
+/*
+#include "Renderer.hpp"
 
-#include <cassert>
 #include <array>
-
-module VulkanWrap:Renderer;
 
 Renderer::Renderer(Window& w, Device& d) : window{ w }, device{ d } {
 	this->recreateSwapChain(); // calls create pipeline
@@ -54,7 +51,7 @@ auto Renderer::createCommandBuffers() -> void {
 			Invalid on Reset -> Initial
 
 		*note: undefined behavior to call Submit on a Command Buffer in the Pending State
-	*/
+	*//*
 	this->commandBuffers.resize(SwapChain::MAX_FRAMES_IN_FLIGHT); // one to one to avoid re-Recording command buffers as they target a frame buffer
 	VkCommandBufferAllocateInfo allocInfo{};
 	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -140,9 +137,7 @@ auto Renderer::beginSwapChainRenderPass(VkCommandBuffer commandBuffer) -> void {
 	renderPassInfo.renderPass = this->swapChain->getRenderPass();
 	renderPassInfo.framebuffer = this->swapChain->getFrameBuffer(this->currentImageIndex); // associate with frame buffer
 
-	/*
-		framebuffers have 2 parts so far, color (index 0) and depth (index 1). This is according to structure given in renderPass
-	*/
+	// framebuffers have 2 parts so far, color (index 0) and depth (index 1). This is according to structure given in renderPass
 
 	renderPassInfo.renderArea.offset = { 0, 0 };
 	renderPassInfo.renderArea.extent = this->swapChain->getSwapChainExtent();
@@ -177,3 +172,5 @@ auto Renderer::endSwapChainRenderPass(VkCommandBuffer commandBuffer) -> void {
 	assert(commandBuffer == this->getCurrentCommandBuffer() && "Can't end render pass on commandbuffer from a different frame");
 	vkCmdEndRenderPass(commandBuffer); // call End event to transition from Recording to Executable
 }
+
+*/

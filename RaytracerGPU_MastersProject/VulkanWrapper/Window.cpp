@@ -1,10 +1,7 @@
 
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
+#include "Window.hpp"
 
-module VulkanWrap:Window;
-
-import <stdexcept>;
+#include <stdexcept>
 
 Window::Window(int w, int h, std::string name) :
 	_width(w),

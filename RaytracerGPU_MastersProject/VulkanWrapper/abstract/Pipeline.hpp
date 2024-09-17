@@ -1,24 +1,20 @@
-module;
+#pragma once
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
+#include "../../utils/PrimitiveTypes.hpp"
+
+#include "../Device.hpp"
+
 #include <cassert>
+#include <string>
+#include <vector>
+#include <fstream>
+#include <stdexcept>
+#include <iostream>
 
-export module VulkanWrap:Pipeline;
-
-import PrimitiveTypes;
-
-import :Device;
-import :Model;
-
-import <string>;
-import <vector>;
-import <fstream>;
-import <stdexcept>;
-import <iostream>;
-
-export class Pipeline {
+class Pipeline {
 
 protected:
 	Device& device;

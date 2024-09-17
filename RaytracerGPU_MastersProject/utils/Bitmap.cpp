@@ -1,7 +1,5 @@
 
-#include <Windows.h>
-
-module Bitmap;
+#include "Bitmap.hpp"
 
 Bitmap::Bitmap() : pen(NULL), brush(NULL), clr(0), wid(1) {}
 Bitmap::Bitmap(u32 w, u32 h, u8 clearVal) :

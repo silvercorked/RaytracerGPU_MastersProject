@@ -1,19 +1,5 @@
-
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
-
-#define GLM_FORCE_RADIANS					// functions expect radians, not degrees
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE			// Depth buffer values will range from 0 to 1, not -1 to 1
-#include <glm/glm.hpp>
-
-#include <tiny_obj_loader.h>
-
-#define GLM_ENABLE_EXPERIMENTAL
-#include <glm/gtx/hash.hpp>
-
-#include <cassert>
-
-module VulkanWrap:Model;
+/*
+#include "Model.hpp"
 
 Model::Model(Device& d, const Model::Builder& builder) :
 	device{ d }
@@ -221,3 +207,4 @@ auto Model::Builder::loadModel(const std::string& filepath) -> void {
 		}
 	}
 }
+*/

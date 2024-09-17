@@ -1,5 +1,6 @@
-module;
+#pragma once
 
+/*
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
@@ -7,28 +8,25 @@ module;
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE			// Depth buffer values will range from 0 to 1, not -1 to 1
 #include <glm/glm.hpp>
 
-#define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/hash.hpp>
 
+#include "Device.hpp"
+#include "Buffer.hpp"
+#include "utils.hpp"
+
 #include <cassert>
-
-export module VulkanWrap:Model;
-
-import :Device;
-import :Buffer;
-import :Utils;
-
-import <vector>;
-import <memory>;
-import <iostream>;
-import <unordered_map>;
-
+#include <vector>
+#include <memory>
+#include <iostream>
+#include <unordered_map>
+*/
 /*
 	Take vertex data from cpu, allocate memory and copy data over to device gpu
 */
-export class Model {
+/*
+class Model {
 	Device& device;
 
 	std::unique_ptr<Buffer> vertexBuffer;
@@ -37,7 +35,7 @@ export class Model {
 	bool hasIndexBuffer = false;			// optional index buffer support. just leave input builder's indices member empty if not desired
 	std::unique_ptr<Buffer> indexBuffer;	// this allows the vertex buffer to only contain unique vertices (and any associated data, like color) // index buffers list indices of vertices in the vertex buffer
 	uint32_t indexCount;					// and avoids copying vertex data to form each triangle
-
+	*/
 	/*
 	 v1 ______ v2/v4
 		|   /|
@@ -52,7 +50,7 @@ export class Model {
 
 		With complex models, it's feasible to have tons of shared vertices. Index buffers reduce memory usage as models get more complex
 	*/
-
+	/*
 public:
 	struct Vertex {
 		glm::vec3 position;
@@ -104,3 +102,5 @@ namespace std { // p sure this is undefined behavior
 		}
 	};
 }
+
+*/

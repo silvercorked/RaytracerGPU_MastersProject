@@ -1,13 +1,11 @@
-module;
+#pragma once
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-export module VulkanWrap:Window;
+#include <string>
 
-import <string>;
-
-export class Window {
+class Window {
 	GLFWwindow* _window;
 	int _width;
 	int _height;

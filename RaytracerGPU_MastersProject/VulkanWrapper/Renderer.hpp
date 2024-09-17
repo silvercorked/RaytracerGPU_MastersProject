@@ -1,26 +1,25 @@
-module;
+#pragma once
+
+/*
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
+#include "../utils/PrimitiveTypes.hpp"
+
+#include "Device.hpp"
+#include "Window.hpp"
+#include "Swapchain.hpp"
+
 #include <cassert>
-
-export module VulkanWrap:Renderer;
-
-import PrimitiveTypes;
-
-import :Device;
-import :Window;
-import :SwapChain;
-
-import <vector>;
-import <memory>;
-import <stdexcept>;
+#include <vector>
+#include <memory>
+#include <stdexcept>
 
 /*
 	In charge of managing swapchain and commandbuffers
-*/
-export class Renderer {
+*//*
+class Renderer {
 	Window& window;
 	Device& device;
 	std::unique_ptr<SwapChain> swapChain;
@@ -64,3 +63,5 @@ public:
 		return this->commandBuffers[this->currentFrameIndex];
 	}
 };
+
+*/

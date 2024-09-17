@@ -1,27 +1,20 @@
-module;
+#pragma once
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-export module VulkanWrap:Device;
+#include "Window.hpp"
 
-import :Window;
+#include <string>
+#include <vector>
 
-// std lib headers
-import <string>;
-import <vector>;
-import <cstring>;
-import <iostream>;
-import <set>;
-import <unordered_set>;
-
-export struct SwapChainSupportDetails {
+struct SwapChainSupportDetails {
     VkSurfaceCapabilitiesKHR capabilities;
     std::vector<VkSurfaceFormatKHR> formats;
     std::vector<VkPresentModeKHR> presentModes;
 };
 
-export struct QueueFamilyIndices {
+struct QueueFamilyIndices {
     uint32_t computeFamily;
     uint32_t graphicsFamily;
     uint32_t presentFamily;
@@ -31,7 +24,7 @@ export struct QueueFamilyIndices {
     bool isComplete() { return computeFamilyHasValue && graphicsFamilyHasValue && presentFamilyHasValue; }
 };
 
-export class Device {
+class Device {
     VkInstance instance;
     VkDebugUtilsMessengerEXT debugMessenger;
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;

@@ -1,14 +1,10 @@
-module;
+#pragma once
 
 #include <vulkan/vulkan.h>
 
-export module VulkanWrap:Buffer;
+#include "Device.hpp"
 
-import :Device;
-
-import <cstring>;
-
-export class Buffer {
+class Buffer {
 	Device& _device;
 	void* _mapped = nullptr;
 	VkBuffer _buffer = VK_NULL_HANDLE;

@@ -1,9 +1,8 @@
 
-#include <vulkan/vulkan.h>
+#include "Descriptors.hpp"
 
 #include <cassert>
-
-module VulkanWrap:Descriptors;
+#include <stdexcept>
 
 auto DescriptorSetLayout::Builder::addBinding(
 	uint32_t binding,

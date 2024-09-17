@@ -1,23 +1,17 @@
-module;
+#pragma once
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-#include <cassert>
+#include "../utils/PrimitiveTypes.hpp"
 
-export module VulkanWrap:ComputePipeline;
+#include "Device.hpp"
+#include "abstract/Pipeline.hpp"
 
-import :Device;
-import :Model;
-import :Pipeline;
+#include <string>
+#include <vector>
 
-import <string>;
-import <vector>;
-import <fstream>;
-import <stdexcept>;
-import <iostream>;
-
-export struct ComputePipelineConfigInfo {
+struct ComputePipelineConfigInfo {
 
 	ComputePipelineConfigInfo() = default;
 
@@ -29,7 +23,7 @@ export struct ComputePipelineConfigInfo {
 	uint32_t										subpass;
 };
 
-export class ComputePipeline : protected Pipeline {
+class ComputePipeline : protected Pipeline {
 
 	auto createComputePipeline(const std::string& computeFilepath, const ComputePipelineConfigInfo& config) -> void;
 	auto getComputeShaderModule() -> VkShaderModule& { return this->shaderModules[0]; }

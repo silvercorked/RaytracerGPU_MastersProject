@@ -1,19 +1,12 @@
 
-// vulkan headers
-#include <vulkan/vulkan.h>
+#include "SwapChain.hpp"
 
 #include <algorithm>
 #include <array>
-
-module VulkanWrap:SwapChain;
-
-// std lib headers
-import <string>;
-import <cstring>;
-import <iostream>;
-import <limits>;
-import <set>;
-import <stdexcept>;
+#include <string>
+#include <iostream>
+#include <limits>
+#include <stdexcept>
 
 SwapChain::SwapChain(Device& deviceRef, VkExtent2D extent) :
     device{ deviceRef },
@@ -115,7 +108,8 @@ VkResult SwapChain::submitCommandBuffers(
     submitInfo.pSignalSemaphores = signalSemaphores;
 
     vkResetFences(this->device.device(), 1, &this->inFlightFences[this->currentFrame]);
-    if (vkQueueSubmit(this->device.graphicsQueue(), 1, &submitInfo, this->inFlightFences[this->currentFrame]) != VK_SUCCESS) { // this->device.graphicsQueue(), all render is done in compute, so swap out queue to submit to
+    auto v = vkQueueSubmit(this->device.graphicsQueue(), 1, &submitInfo, this->inFlightFences[this->currentFrame]);
+    if (v != VK_SUCCESS) { // this->device.graphicsQueue(), all render is done in compute, so swap out queue to submit to
         throw std::runtime_error("failed to submit draw command buffer!");
     }
 

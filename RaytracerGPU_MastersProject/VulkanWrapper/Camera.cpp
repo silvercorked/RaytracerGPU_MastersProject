@@ -1,12 +1,5 @@
 
-#define GLM_FORCE_RADIANS					// functions expect radians, not degrees
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE			// Depth buffer values will range from 0 to 1, not -1 to 1
-#include <glm/glm.hpp>
-
-#include <cassert>
-
-module VulkanWrap:Camera;
-
+#include "Camera.hpp"
 /*
 	Transformation order:
 	1) Model transform (from object space to world space)
@@ -149,7 +142,7 @@ auto Camera::setPerspectiveProjection(float fovy, float aspect, float near, floa
 	this->projectionMatrix[3][2] = -(far * near) / (far - near);
 }
 /*
-	[[ u.x u.y u.z 0 ]^-1  [[ 1 0 0 -p.x ]
+	   [[ u.x u.y u.z 0 ]^-1  [[ 1 0 0 -p.x ]
 		[ v.x v.y v.z 0 ]      [ 0 1 0 -p.y ]
 		[ w.x w.y w.z 0 ]      [ 0 0 1 -p.z ]
 		[ 0   0   0   1 ]]     [ 0 0 0  1   ]] // rotation * translation = camera transformation

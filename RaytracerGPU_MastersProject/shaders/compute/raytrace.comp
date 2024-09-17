@@ -3,53 +3,53 @@
 layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 
 #include "../include/definitions.glsl"
-#include "../include/random.glsl"
+
 
 layout(binding = 0) uniform ParameterUBO {
-	vec3 camPos;
-	vec3 camDir;
-	uint currentSample;
+	vec4 camPos; // ignore w
+	vec4 camDir; // ignore w
+	float verticalFOV;
 	uint numTriangles;
 	uint numSpheres;
+	uint numMaterials;
+	uint numLights;
 	uint maxRayTraceDepth;
+	uint randomState;
 } ubo;
+
+#include "../include/random.glsl" // requires ubo defined
 
 layout(binding = 1, rgba8) uniform image2D outputImage;
 
-layout(binding = 2, rgba8) uniform image2D accumulationImage;
-
-layout(std430, binding = 3) readonly buffer TriangleBufferObject {
+layout(std430, binding = 2) readonly buffer TriangleBufferObject {
 	Triangle triangles[ ];
 };
 
-layout(std430, binding = 4) readonly buffer SpheresBufferObject {
+layout(std430, binding = 3) readonly buffer SpheresBufferObject {
 	Sphere spheres[ ];
 };
 
-layout(std430, binding = 5) readonly buffer MaterialBufferObject {
+layout(std430, binding = 4) readonly buffer MaterialBufferObject {
 	Material materials[ ];
 };
 
-layout(std430, binding = 6) readonly buffer LightsBufferObject {
-	Light lights[ ];
+layout(std430, binding = 5) buffer scratchBufferObject {
+	float scratch[ ];
 };
 
-
-
 // constants
-const float VERTICAL_FOV = 30;
 const float FOCAL_LENGTH = 1.0f;
+const vec3 BACKGROUND_COLOR = vec3(0);
 
-const vec2 imageDimensions = vec2(imageSize(outputImage));
-const float theta = VERTICAL_FOV * pi / 180.0f;
-const float h = tan(theta / 2);
-const float viewportHeight = 2.0f * h;
-const float viewportWidth = imageDimensions.x / imageDimensions.y * viewportHeight;
-const vec3 horizontalDir = vec3(viewportWidth, 0, 0);
-const vec3 verticalDir = vec3(0, -viewportHeight, 0);
-const vec3 origin = ubo.camPos * ubo.camDir;
-const vec3 bottomLeftCorner = origin - (horizontalDir / 2) - (verticalDir / 2) - vec3(0, 0, FOCAL_LENGTH);
-
+float theta = ubo.verticalFOV * pi / 180.0f;
+float h = tan(theta / 2);
+float viewportHeight = 2.0f * h;
+vec3 origin = ubo.camPos.xyz;
+vec2 imageDimensions = vec2(imageSize(outputImage));
+float viewportWidth = (imageDimensions.x / float(imageDimensions.y)) * viewportHeight;
+vec3 horizontalDir = vec3(viewportWidth, 0, 0);
+vec3 verticalDir = vec3(0, -viewportHeight, 0);
+vec3 bottomLeftCorner = origin - (horizontalDir / 2) - (verticalDir / 2) + (ubo.camDir.xyz * FOCAL_LENGTH);
 
 // get point along ray at t time
 vec3 pointOnRayWithT(in Ray r, in float t) {
@@ -63,20 +63,20 @@ vec3 pointOnRayWithT(in Ray r, in float t) {
 //	return triangles[triangleIndex].Quv[0] + a * triangles[triangleIndex].Quv[1] + b * triangles[triangleIndex].Quv[2];
 //}
 
-bool scatter(in Ray rIn, in HitRecord rec, out vec3 albedo, out ray scattered) {
-	albedo = materials[rec.materialIndex].albedo;
-	scattered = Ray(rec.p, normalize(random_in_hemisphere(rec.normal)));
+bool scatter(in Ray rIn, in HitRecord rec, out vec3 albedo, out Ray scattered) {
+	albedo = materials[rec.materialIndex].albedo.xyz;
+	scattered = Ray(rec.p, normalize(randomInHemisphere(rec.normal)));
 	return materials[rec.materialIndex].materialType == LIGHT_MATERIAL;
 }
 
 // https://github.com/silvercorked/RaytracerInAWeekend/blob/main/Raytracer/Triangle.hpp#L77 see comment here for math
 bool triangleHit(in uint triangleIndex, in Ray r, in float tMin, in float tMax, inout HitRecord rec) {
 	Triangle tri = triangles[triangleIndex];
-	vec3 u = tri.v1 - tri.v0;
-	vec3 v = tri.v2 - tri.v0;
+	vec3 u = tri.v1.xyz - tri.v0.xyz;
+	vec3 v = tri.v2.xyz - tri.v0.xyz;
 	vec3 triNormalUnnormalized = cross(u, v);
 	vec3 triNormal = normalize(triNormalUnnormalized);
-	float D = dot(triNormal, tri.Quv[0]);
+	float D = dot(triNormal, tri.v0.xyz);
 	vec3 w = triNormalUnnormalized / dot(triNormalUnnormalized, triNormalUnnormalized);
 	float denom = dot(triNormal, r.direction);
 	if (abs(denom) < 0.0001) return false; // too close to parallel (and likely dont hit anyway)
@@ -85,15 +85,15 @@ bool triangleHit(in uint triangleIndex, in Ray r, in float tMin, in float tMax, 
 	if (t < tMin || t > tMax) return false; // outside interval
 	
 	vec3 possIntersectionPoint = pointOnRayWithT(r, t);
-	vec3 pointOnPlane = possIntersectionPoint - tri.v0;
-	float a = dot(w, cross(pointOnPlane, v);
+	vec3 pointOnPlane = possIntersectionPoint - tri.v0.xyz;
+	float a = dot(w, cross(pointOnPlane, v));
 	float b = dot(w, cross(u, pointOnPlane));
-	if (!(a < 0 || b < 0 || a + b > 1)) return false; // miss
+	if (a < 0 || b < 0 || a + b > 1) return false; // miss
 	
 	rec.t = t;
 	rec.p = possIntersectionPoint;
-	rec.u = u;
-	rec.v = v;
+	rec.u = a;
+	rec.v = b;
 
 	rec.normal = triNormal;
 	rec.backFaceInt = dot(r.direction, rec.normal) > 0 ? 1 : 0;
@@ -106,11 +106,11 @@ bool triangleHit(in uint triangleIndex, in Ray r, in float tMin, in float tMax, 
 // https://github.com/silvercorked/RaytracerInAWeekend/blob/main/Raytracer/Sphere.hpp#L86 see comment here for math
 bool sphereHit(in uint sphereIndex, in Ray r, in float tMin, in float tMax, inout HitRecord rec) {
 	Sphere s = spheres[sphereIndex];
-	vec3 oc = r.origin - s.center;
+	vec3 oc = r.origin - s.center.xyz;
 	float a = dot(r.direction, r.direction);
 	float halfB = dot(oc, r.direction);
 	float c = dot(oc, oc) - (s.radius * s.radius);
-	float underRadical = halfB * halfB - a * c;
+	float underRadical = (halfB * halfB) - (a * c);
 	if (underRadical < 0) return false;
 	
 	float radical = sqrt(underRadical);
@@ -124,14 +124,15 @@ bool sphereHit(in uint sphereIndex, in Ray r, in float tMin, in float tMax, inou
 	rec.t = root;
 	rec.p = pointOnRayWithT(r, rec.t);
 	// https://github.com/silvercorked/RaytracerInAWeekend/blob/main/Raytracer/Sphere.hpp#L64 for math (uses sphereical coords theta and phi)
-	rec.u = (atan2(-s.center.z, s.center.x) + pi) / (2 * pi);
+	rec.u = (atan(-s.center.z, s.center.x) + pi) / (2 * pi);
 	rec.v = acos(-s.center.y) / pi;
 
-	rec.normal = (rec.p - s.center) / radius;
+	rec.normal = (rec.p - s.center.xyz) / s.radius;
 	rec.backFaceInt = dot(r.direction, rec.normal) > 0 ? 1 : 0;
 	rec.normal *= 1 - 2 * rec.backFaceInt; // * -1 if backface, * 1 otherwise
 
 	rec.materialIndex = s.materialIndex;
+	return true;
 }
 
 bool sceneHit(in Ray r, out HitRecord rec) {
@@ -140,14 +141,16 @@ bool sceneHit(in Ray r, out HitRecord rec) {
 	HitRecord temp;
 	bool hitAny = false;
 	float closestSoFar = tMax;
-	for (uint i = 0; i < ubo.numTriangles; i++) {
+	uint i = 0;
+	for (; i < ubo.numTriangles; i++) {
 		if (triangleHit(i, r, tMin, closestSoFar, temp)) {
 			hitAny = true;
 			closestSoFar = temp.t;
 			rec = temp;
 		}
 	}
-	for (uint i = 0; i < ubo.numSpheres; i++) {
+	i = 0;
+	for (; i < ubo.numSpheres; i++) {
 		if (sphereHit(i, r, tMin, closestSoFar, temp)) {
 			hitAny = true;
 			closestSoFar = temp.t;
@@ -158,11 +161,11 @@ bool sceneHit(in Ray r, out HitRecord rec) {
 }
 
 vec3 rayColor(inout Ray r) {
-	vec3 unitDir = normalize(r.dir);
+	vec3 unitDir = normalize(r.direction);
 	HitRecord rec;
 	vec3 finalColor = vec3(1.0);
 	Ray curr = { r.origin, unitDir };
-	for (uint i = 0; i < maxRayTraceDepth; i++) {
+	for (uint i = 0; i < ubo.maxRayTraceDepth; i++) {
 		if (sceneHit(curr, rec)) {
 			vec3 albedo;
 			bool emits = scatter(curr, rec, albedo, curr);
@@ -171,7 +174,7 @@ vec3 rayColor(inout Ray r) {
 				break;
 		}
 		else {
-			finalColor *= 0.0; // background
+			return finalColor * BACKGROUND_COLOR; // background
 		}
 	}
 	return finalColor;
@@ -179,19 +182,139 @@ vec3 rayColor(inout Ray r) {
 
 // create a ray based on x and y coords of camera quad
 Ray getRay(in vec2 xy) {
-	vec2 uv = xy / imageDimensions.xy;
+	vec2 uv = mod(xy, imageDimensions.xy); // int mod to get pixel coord (was multiplied by n for # of raycasts per pixel)
+	uv = uv / imageDimensions.xy; // rescale from 0-imageDimensions, to 0-1
 	return Ray(origin, bottomLeftCorner + uv.x * horizontalDir + uv.y * verticalDir);
 }
 
-// vkCmdDispatch(commandBuffer, (outImageWidth * n) / 32, (outImageHeight * n) / 32, 1); // will do n ray casts per pixel of output image
+// vkCmdDispatch(commandBuffer, outImageWidth + 1, outImageHeight + 1, n); // will do n ray casts per pixel of output image
+// if extra size is sent ((1920/32) = 60, but (1080/32) = 33.75, so ~60x34 -> 2040 threads should be used on the gpu for 1 1920x1080 image with a single ray
+// extra size will be effectively ignored via the behavior of the imageLoad and imageStore functions
+// https://www.khronos.org/opengl/wiki/Image_Load_Store#Image_load
 void main() { // gl_GlobalInvocationID.xy represents pixel locations
 	Ray r = getRay(gl_GlobalInvocationID.xy);
+	uint rayNum = gl_GlobalInvocationID.z;
+	// cuda core (nvinda) or SM, task (1M pixels per screen, only ~4000 per fancy gpus)
 	// get ray color
 	vec3 pixelColor = rayColor(r);
+	//scratch[0] = -1;
+	//scratch[1] = -2;
+	//scratch[2] = -4;
+	//scratch[3] = -8;
+	//scratch[19] = -19;
+	//Ray testRay = Ray(vec3(0,1.0,0), vec3(0,0,1));
+	//vec3 temp = rayColor(testRay);
+	//scratch[0] = temp.x;
+	//scratch[1] = temp.y;
+	//scratch[2] = temp.z;
+	/*
+	HitRecord rec;
+	Sphere s = spheres[1];
+	bool hit = sphereHit(1, testRay, 0, 100.0, rec);
+	scratch[0] = hit == true ? 1 : -1;
+	scratch[1] = rec.t;
+	scratch[2] = rec.p.x;
+	scratch[3] = rec.p.y;
+	scratch[4] = rec.p.z;
+	vec3 oc = testRay.origin - s.center.xyz;
+	float a = dot(testRay.direction, testRay.direction);
+	float halfB = dot(oc, testRay.direction);
+	float c = dot(oc, oc) - (s.radius * s.radius);
+	float underRadical = (halfB * halfB) - (a * c);
+	float radical = sqrt(underRadical);
+	float root = (-halfB - radical) / a;
+	float root2 = (-halfB + radical) / a;
+	scratch[5] = oc.x;
+	scratch[6] = oc.y;
+	scratch[7] = oc.z;
+	scratch[8] = a;
+	scratch[9] = halfB;
+	scratch[10] = c;
+	scratch[11] = underRadical;
+	scratch[12] = radical;
+	scratch[13] = root;
+	scratch[14] = root2;
+	scratch[15] = s.radius;
+	*/
+	/*
+	HitRecord rec;
+	Triangle s = triangles[1];
+	vec3 u = s.v1.xyz - s.v0.xyz;
+	vec3 v = s.v2.xyz - s.v0.xyz;
+	vec3 triNormalUnnormalized = cross(u, v);
+	vec3 triNormal = normalize(triNormalUnnormalized);
+	float D = dot(triNormal, s.v0.xyz);
+	vec3 w = triNormalUnnormalized / dot(triNormalUnnormalized, triNormalUnnormalized);
+	float denom = dot(triNormal, testRay.direction);
+	
+	float t = (D - dot(triNormal, testRay.origin)) / denom;
+	
+	vec3 possIntersectionPoint = pointOnRayWithT(testRay, t);
+	vec3 pointOnPlane = possIntersectionPoint - s.v0.xyz;
+	float a = dot(w, cross(pointOnPlane, v));
+	float b = dot(w, cross(u, pointOnPlane));
+	bool hit = triangleHit(1, testRay, 0, 100.0, rec);
+	scratch[0] = hit == true ? 1 : -1;
+	scratch[1] = rec.t;
+	scratch[2] = rec.p.x;
+	scratch[3] = rec.p.y;
+	scratch[4] = rec.p.z;
+	scratch[5] = a;
+	scratch[6] = b;
+	scratch[7] = pointOnPlane.x;
+	scratch[8] = pointOnPlane.y;
+	scratch[9] = pointOnPlane.z;
+	scratch[10] = abs(denom);
+	*/
+	/*
+	vec3 oc = testRay.origin - s.center.xyz;
+	float a = dot(testRay.direction, testRay.direction);
+	float halfB = dot(oc, testRay.direction);
+	float c = dot(oc, oc) - (s.radius * s.radius);
+	float underRadical = (halfB * halfB) - (a * c);
+	float radical = sqrt(underRadical);
+	float root = (-halfB - radical) / a;
+	float root2 = (-halfB + radical) / a;
+	scratch[5] = oc.x;
+	scratch[6] = oc.y;
+	scratch[7] = oc.z;
+	scratch[8] = a;
+	scratch[9] = halfB;
+	scratch[10] = c;
+	scratch[11] = underRadical;
+	scratch[12] = radical;
+	scratch[13] = root;
+	scratch[14] = root2;
+	scratch[15] = s.radius;
+	*/
+	//if (gl_GlobalInvocationID.xy == uvec2(1000, 500)) {
+	//	scratch[0] = gl_GlobalInvocationID.x;
+	//	scratch[1] = gl_GlobalInvocationID.y;
+	//	scratch[2] = r.origin.x;
+	//	scratch[3] = r.origin.y;
+	//	scratch[4] = r.origin.z;
+	//	scratch[5] = r.direction.x;
+	//	scratch[6] = r.direction.y;
+	//	scratch[7] = r.direction.z;
+	//	scratch[8] = origin.x;
+	//	scratch[9] = origin.y;
+	//	scratch[10] = origin.z;
+	//	scratch[11] = bottomLeftCorner.x;
+	//	scratch[12] = bottomLeftCorner.y;
+	//	scratch[13] = bottomLeftCorner.z;
+	//	scratch[14] = horizontalDir.x;
+	//	scratch[15] = horizontalDir.y;
+	//	scratch[16] = horizontalDir.z;
+	//	scratch[17] = verticalDir.x;
+	//	scratch[18] = verticalDir.y;
+	//	scratch[19] = verticalDir.z;
+	//}
+
 	// add gathered color to outputImage's current color
-	vec4 currentColor = imageLoad(accumulationImage, ivec2(gl_GlobalInvocationID.xy)).rgba * min(float(ubo.currentSample), 1.0);
-	vec4 newColor = (vec4(pixelColor, 1.0) + currentColor * ubo.currentSample) / (float(ubo.currentSample) + 1.0);
-	imageStore(outputImage, ivec2(gl_GlobalInvocationID.xy), newColor);
+	//vec4 currentColor = imageLoad(outputImage, ivec2(gl_GlobalInvocationID.xy)).rgba; // * min(float(ubo.currentSample), 1.0);
+	//vec4 newColor = ((vec4(pixelColor, 1.0) + currentColor * rayNum) / (rayNum + 1));
+	//vec4 newColor = (vec4(pixelColor, 1.0) + currentColor) / 2.0;
+	imageStore(outputImage, ivec2(gl_GlobalInvocationID.xy), vec4(pixelColor, 1.0));
 	// another pass may be needed for adding the gamma-correction term, as the entire image needs to be done
 	// (see color.hpp in Raytracer project)
 }

@@ -3,34 +3,45 @@
 layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
 
 #include "../include/definitions.glsl"
-#include "../include/random.glsl"
 
 layout(binding = 0) uniform ParameterUBO {
-	vec3 camPos;
-	vec3 camDir;
-	uint currentSample;
+	vec4 camPos; // ignore w
+	vec4 camDir; // ignore w
+	float verticalFOV;
 	uint numTriangles;
 	uint numSpheres;
+	uint numMaterials;
+	uint numLights;
 	uint maxRayTraceDepth;
+	uint randomState;
 } ubo;
 
-layout(std430, binding = 3) buffer TriangleBufferObject {
+layout(std430, binding = 1) readonly buffer ModelBufferObject {
+	Model models[ ];
+};
+layout(std430, binding = 2) buffer TriangleBufferObject {
 	Triangle triangles[ ];
 };
-
-layout(std430, binding = 4) buffer SpheresBufferObject {
+layout(std430, binding = 3) buffer SpheresBufferObject {
 	Sphere spheres[ ];
 };
 
-layout(std430, binding = 5) readonly buffer ModelBufferObject {
-	Model models[ ];
-};
-
-// vkCmdDispatch(commandBuffer, max(numTriangles, numSpheres) / 32, 1, 1);
+// vkCmdDispatch(commandBuffer, ((numTriangles + numSpheres) / 32) + 1, 1, 1);
+	// should behave fine if no triangles or spheres exist
 void main() {
-	bool trianglesLonger = ubo.numTriangles > ubo.numSpheres;
 	uint i = gl_GlobalInvocationID.x;
-	if (trianglesLonger) { // constant between invocations
-		triangleToModelSp
+	if (i < ubo.numTriangles) {
+		Triangle t = triangles[i];
+		Model m = models[t.modelIndex];
+		t.v0 = (m.modelMatrix * vec4(t.v0.xyz, 1.0));
+		t.v1 = (m.modelMatrix * vec4(t.v1.xyz, 1.0));
+		t.v2 = (m.modelMatrix * vec4(t.v2.xyz, 1.0));
+		triangles[i] = t;
+	}
+	else if (i < (ubo.numTriangles + ubo.numSpheres)) { // processSphere, if result is false, was an extra dispatch to fit 32 size work groups and can be ignored
+		i = i - ubo.numTriangles; // get right index
+		Sphere s = spheres[i];
+		s.center = models[s.modelIndex].modelMatrix * vec4(s.center.xyz, 1.0);
+		spheres[i] = s;
 	}
 }

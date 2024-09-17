@@ -1,17 +1,14 @@
-module;
+#pragma once
 
 // vulkan headers
 #include <vulkan/vulkan.h>
 
-export module VulkanWrap:SwapChain;
+#include "Device.hpp"
 
-import :Device;
+#include <vector>
+#include <memory>
 
-// std lib headers
-import <vector>;
-import <memory>;
-
-export class SwapChain {
+class SwapChain {
     VkFormat swapChainImageFormat;
     VkFormat swapChainDepthFormat;
     VkExtent2D swapChainExtent;

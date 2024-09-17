@@ -1,10 +1,8 @@
 
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
+#include "ComputePipeline.hpp"
 
 #include <cassert>
-
-module VulkanWrap:ComputePipeline;
+#include <stdexcept>
 
 ComputePipeline::ComputePipeline(
 	Device& device,

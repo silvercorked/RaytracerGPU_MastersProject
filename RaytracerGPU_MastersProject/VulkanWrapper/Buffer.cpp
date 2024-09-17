@@ -1,9 +1,7 @@
 
-#include <vulkan/vulkan.h>
+#include "Buffer.hpp"
 
 #include <cassert>
-
-module VulkanWrap:Buffer;
 
 // smallest size in bytes that satisfies alignment
 /*

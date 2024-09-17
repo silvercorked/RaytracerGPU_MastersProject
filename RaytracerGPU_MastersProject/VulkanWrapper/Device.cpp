@@ -1,8 +1,13 @@
 
+#include "Device.hpp"
+
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-module VulkanWrap:Device;
+#include <string>
+#include <iostream>
+#include <set>
+#include <unordered_set>
 
 // local callback functions
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(

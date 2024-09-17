@@ -18,34 +18,10 @@
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="utils\Bitmap.ixx">
+    <ClCompile Include="utils\Bitmap.hpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="BifurcationPlotter.ixx">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="utils\PrimitiveTypes.ixx">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="VulkanComputeHelper.ixx">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="VulkanWrapper\Buffer.ixx">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="VulkanWrapper\Device.ixx">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="VulkanWrapper\VulkanWrap.ixx">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="VulkanWrapper\Window.ixx">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="VulkanWrapper\Camera.ixx">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="VulkanWrapper\Descriptors.ixx">
+    <ClCompile Include="LogisticMap.hpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="VulkanWrapper\Window.cpp">
@@ -66,43 +42,91 @@
     <ClCompile Include="VulkanWrapper\Descriptors.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="VulkanWrapper\SwapChain.ixx">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="VulkanWrapper\SwapChain.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="VulkanWrapper\Renderer.ixx">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="VulkanWrapper\Renderer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="VulkanWrapper\GraphicsPipeline.ixx">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="VulkanWrapper\GraphicsPipeline.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="VulkanWrapper\Model.ixx">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="VulkanWrapper\Model.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="VulkanWrapper\Utils.ixx">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="VulkanWrapper\abstract\Pipeline.ixx">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="VulkanWrapper\abstract\Pipeline.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="VulkanWrapper\ComputePipeline.ixx">
+    <ClCompile Include="VulkanWrapper\ComputePipeline.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="VulkanWrapper\ComputePipeline.cpp">
+    <ClCompile Include="VulkanWrapper\abstract\Pipeline.hpp">
+      <Filter>Header Files</Filter>
+    </ClCompile>
+    <ClCompile Include="VulkanWrapper\Buffer.hpp">
+      <Filter>Header Files</Filter>
+    </ClCompile>
+    <ClCompile Include="utils\PrimitiveTypes.hpp">
+      <Filter>Header Files</Filter>
+    </ClCompile>
+    <ClCompile Include="VulkanWrapper\Camera.hpp">
+      <Filter>Header Files</Filter>
+    </ClCompile>
+    <ClCompile Include="VulkanWrapper\ComputePipeline.hpp">
+      <Filter>Header Files</Filter>
+    </ClCompile>
+    <ClCompile Include="VulkanWrapper\Descriptors.hpp">
+      <Filter>Header Files</Filter>
+    </ClCompile>
+    <ClCompile Include="VulkanWrapper\Device.hpp">
+      <Filter>Header Files</Filter>
+    </ClCompile>
+    <ClCompile Include="VulkanWrapper\Model.hpp">
+      <Filter>Header Files</Filter>
+    </ClCompile>
+    <ClCompile Include="VulkanWrapper\GraphicsPipeline.hpp">
+      <Filter>Header Files</Filter>
+    </ClCompile>
+    <ClCompile Include="VulkanWrapper\Renderer.hpp">
+      <Filter>Header Files</Filter>
+    </ClCompile>
+    <ClCompile Include="VulkanWrapper\RaytraceScene.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="VulkanWrapper\RaytraceScene.hpp">
+      <Filter>Header Files</Filter>
+    </ClCompile>
+    <ClCompile Include="VulkanWrapper\SwapChain.hpp">
+      <Filter>Header Files</Filter>
+    </ClCompile>
+    <ClCompile Include="VulkanWrapper\utils.hpp">
+      <Filter>Header Files</Filter>
+    </ClCompile>
+    <ClCompile Include="VulkanWrapper\Window.hpp">
+      <Filter>Header Files</Filter>
+    </ClCompile>
+    <ClCompile Include="VulkanWrapper\GameObject.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="VulkanWrapper\components\TransformComponent.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="VulkanWrapper\KeyboardMovementController.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="VulkanWrapper\CameraGameObject.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="VulkanWrapper\RTModel.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="LogisticMap.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Raytracer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Scenes.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -116,9 +140,42 @@
     <None Include="shaders\compute\raytrace.comp" />
     <None Include="shaders\include\definitions.glsl" />
     <None Include="shaders\include\random.glsl" />
+    <None Include="shaders\compute\ModelSpaceToWorldSpace.comp" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="Plan.txt" />
     <Text Include="README.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="VulkanWrapper\GameObject.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="VulkanWrapper\components\TransformComponent.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="VulkanWrapper\components\PointLightComponent.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="VulkanWrapper\RTModel.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="VulkanWrapper\SceneTypes.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="VulkanWrapper\CameraGameObject.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="VulkanWrapper\KeyboardMovementController.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Raytracer.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Scenes.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Config.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

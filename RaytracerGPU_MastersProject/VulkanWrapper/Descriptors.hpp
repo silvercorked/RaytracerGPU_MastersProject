@@ -1,18 +1,14 @@
-module;
+#pragma once
 
 #include <vulkan/vulkan.h>
 
-export module VulkanWrap:Descriptors;
+#include "Device.hpp"
 
-import :Device;
+#include <memory>
+#include <unordered_map>
+#include <vector>
 
-// std lib headers
-import <memory>;
-import <unordered_map>;
-import <vector>;
-import <stdexcept>;
-
-export class DescriptorSetLayout {
+class DescriptorSetLayout {
 	Device& device;
 	VkDescriptorSetLayout descriptorSetLayout;
 	std::unordered_map<uint32_t, VkDescriptorSetLayoutBinding> bindings;
@@ -43,7 +39,7 @@ public:
 	auto getDescriptorSetLayout() const -> VkDescriptorSetLayout { return this->descriptorSetLayout; }
 };
 
-export class DescriptorPool {
+class DescriptorPool {
 	Device& device;
 	VkDescriptorPool descriptorPool;
 
@@ -79,7 +75,7 @@ public:
 	auto resetPool() -> void;
 };
 
-export class DescriptorWriter {
+class DescriptorWriter {
 	DescriptorSetLayout& setLayout;
 	DescriptorPool& pool;
 	std::vector<VkWriteDescriptorSet> writes;

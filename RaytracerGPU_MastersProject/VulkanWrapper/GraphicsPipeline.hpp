@@ -1,23 +1,19 @@
-module;
+#pragma once
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
+#include "Device.hpp"
+#include "abstract/Pipeline.hpp"
+
 #include <cassert>
+#include <string>
+#include <vector>
+#include <fstream>
+#include <stdexcept>
+#include <iostream>
 
-export module VulkanWrap:GraphicsPipeline;
-
-import :Device;
-//import :Model;
-import :Pipeline;
-
-import <string>;
-import <vector>;
-import <fstream>;
-import <stdexcept>;
-import <iostream>;
-
-export struct GraphicsPipelineConfigInfo {
+struct GraphicsPipelineConfigInfo {
 
 	GraphicsPipelineConfigInfo() = default;
 
@@ -40,7 +36,7 @@ export struct GraphicsPipelineConfigInfo {
 	uint32_t										subpass = 0;
 };
 
-export class GraphicsPipeline : protected Pipeline {
+class GraphicsPipeline : protected Pipeline {
 
 	auto createGraphicsPipeline(const std::string& vertFilepath, const std::string& fragFilepath, const GraphicsPipelineConfigInfo& config) -> void;
 	auto getVertShaderModule() -> VkShaderModule& { return this->shaderModules[0]; }
