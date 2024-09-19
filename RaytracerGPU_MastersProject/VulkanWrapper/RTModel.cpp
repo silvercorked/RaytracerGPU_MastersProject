@@ -38,6 +38,13 @@ auto RTModel_Sphere::getMaterialType() const -> SceneTypes::GPU::Material {
 }
 
 auto loadModel(const std::string& filepath, glm::vec3 color) -> std::unique_ptr<RTModel> {
+	SceneTypes::GPU::Material mat;
+	mat.materialType = SceneTypes::MaterialType::DIFFUSE;
+	mat.albedo = color;
+	return loadModel(filepath, mat);
+}
+
+auto loadModel(const std::string& filepath, SceneTypes::GPU::Material mat) -> std::unique_ptr<RTModel> {
 	tinyobj::attrib_t attrib;
 	std::vector<tinyobj::shape_t> shapes;
 	std::vector<tinyobj::material_t> materials;
@@ -85,9 +92,6 @@ auto loadModel(const std::string& filepath, glm::vec3 color) -> std::unique_ptr<
 			indices.push_back(uniqueVertices[vertex]);
 		}
 	}
-	SceneTypes::GPU::Material mat;
-	mat.albedo = glm::vec4(color, 0.0f);
-	mat.materialType = SceneTypes::MaterialType::DIFFUSE; // simple diffuse stuff for now
 	std::vector<SceneTypes::CPU::Triangle> triangles;
 	triangles.reserve(indices.size() / 3);
 	for (auto i = 0; i < indices.size(); i += 3) {

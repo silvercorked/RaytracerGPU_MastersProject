@@ -105,4 +105,5 @@ namespace SceneTypes {
 			}
 		};
 	};
+	using Material = SceneTypes::GPU::Material;
 };

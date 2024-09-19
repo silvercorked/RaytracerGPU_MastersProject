@@ -50,3 +50,8 @@ vec3 randomCosineDirection() {
 	float y = sin(phi) * sqrt(r2);
 	return vec3(x, y, z);
 }
+vec3 randomInUnitDisk() {
+	float theta = random(0, 2 * pi);
+	float r = random(0, 1);
+	return vec3(r * cos(theta), r * sin(theta), 0);
+}

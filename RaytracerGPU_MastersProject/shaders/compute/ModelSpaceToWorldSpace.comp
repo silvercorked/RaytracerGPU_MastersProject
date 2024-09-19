@@ -6,7 +6,8 @@ layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
 
 layout(binding = 0) uniform ParameterUBO {
 	vec4 camPos; // ignore w
-	vec4 camDir; // ignore w
+	vec4 camLookAt; // ignore w
+	vec4 camUpDir; // ignore w
 	float verticalFOV;
 	uint numTriangles;
 	uint numSpheres;

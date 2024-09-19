@@ -29,7 +29,8 @@
 namespace RaytracerRenderer {
 	struct UniformBufferObject {
 		alignas(16) glm::vec3 camPos;
-		alignas(16) glm::vec3 camDir;
+		alignas(16) glm::vec3 camLookAt;
+		alignas(16) glm::vec3 camUpDir;
 		alignas(16) f32 verticalFOV;
 		u32 numTriangles;
 		u32 numSpheres;
@@ -279,8 +280,11 @@ namespace RaytracerRenderer {
 			this->recordGraphicsCommandBuffer(this->graphicsCommandBuffer, imageIndex);
 
 			RaytracerRenderer::UniformBufferObject nUbo{};
-			nUbo.camPos = glm::vec3(0.0f, 1.0f, 0.0f);
-			nUbo.camDir = glm::vec3(0.0f, -1.0f, 1.0f);
+			//nUbo.camPos = glm::vec3(0.0f, 1.0f, 0.0f);
+			//nUbo.camDir = glm::vec3(0.0f, -1.0f, 1.0f);
+			nUbo.camPos = glm::vec3(275.0f, 275.0f, -800.0f); //glm::vec3(250.0f, 250.0f, -800.0f);
+			nUbo.camLookAt = glm::vec3(275.0f, 275.0f, 0.0f);
+			nUbo.camUpDir = glm::vec3(0.0, 1.0f, 0.0f);
 			nUbo.verticalFOV = this->scene->getCamera().getVerticalFOV();
 			nUbo.numTriangles = this->scene->getTriangleCount();
 			nUbo.numSpheres = this->scene->getSphereCount();
@@ -297,9 +301,9 @@ namespace RaytracerRenderer {
 					1
 				);
 				std::cout << std::format(
-					"UNIFORM BUFFER: camera pos: ({}, {}, {}), dir: ({}, {}, {}), \n\tverticalFOV: {}, triangleCount: {}, sphereCount: {}\n\t materialCount: {}, raytraceDepth: {}, randomState: {}\n",
+					"UNIFORM BUFFER: camera pos: ({}, {}, {}), lookAt: ({}, {}, {}), \n\tverticalFOV: {}, triangleCount: {}, sphereCount: {}\n\t materialCount: {}, raytraceDepth: {}, randomState: {}\n",
 					resultFromGPU[0].camPos.x, resultFromGPU[0].camPos.y, resultFromGPU[0].camPos.z,
-					resultFromGPU[0].camDir.x, resultFromGPU[0].camDir.y, resultFromGPU[0].camDir.z,
+					resultFromGPU[0].camLookAt.x, resultFromGPU[0].camLookAt.y, resultFromGPU[0].camLookAt.z,
 					resultFromGPU[0].verticalFOV, resultFromGPU[0].numTriangles,
 					resultFromGPU[0].numSpheres, resultFromGPU[0].numMaterials,
 					resultFromGPU[0].maxRayTraceDepth, resultFromGPU[0].randomState

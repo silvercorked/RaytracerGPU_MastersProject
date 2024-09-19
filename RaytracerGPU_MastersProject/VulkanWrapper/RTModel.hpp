@@ -81,4 +81,5 @@ public:
 using RTModel = std::variant<RTModel_Triangles, RTModel_Sphere>;
 
 auto loadModel(const std::string& filepath, glm::vec3 color) -> std::unique_ptr<RTModel>;
+auto loadModel(const std::string& filepath, SceneTypes::GPU::Material mat) -> std::unique_ptr<RTModel>;
 auto loadModel(f32 radius, SceneTypes::GPU::Material mat) -> std::unique_ptr<RTModel>;

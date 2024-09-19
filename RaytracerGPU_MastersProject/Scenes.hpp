@@ -9,3 +9,5 @@
 auto randomSpheres(std::unique_ptr<RaytraceScene>& scene) -> void;
 
 auto cornellMixedScene(std::unique_ptr<RaytraceScene>& scene) -> void;
+
+auto cornellBoxScene(std::unique_ptr<RaytraceScene>& scene) -> void;

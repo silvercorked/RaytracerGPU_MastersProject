@@ -5,7 +5,7 @@
 
 namespace RaytracerRenderer {
 	Raytracer::Raytracer() :
-		window{ 256, 256, "Compute-based Images" },
+		window{ 800, 800, "Compute-based Images" },
 		device{ window } {
 		this->initVulkan();
 	}
@@ -270,7 +270,7 @@ namespace RaytracerRenderer {
 		);
 
 		this->scene = std::make_unique<RaytraceScene>(this->device);
-		cornellMixedScene(this->scene);
+		cornellBoxScene(this->scene);
 	}
 
 	auto Raytracer::createUniformBuffers() -> void { // just 1
@@ -430,19 +430,17 @@ namespace RaytracerRenderer {
 			VK_IMAGE_LAYOUT_GENERAL, &clearValue, 1, &range
 		);
 
-
-		/*
-		VkImageMemoryBarrier swapChainToCompute;
-		swapChainToCompute.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-		swapChainToCompute.pNext = nullptr;
-		swapChainToCompute.srcAccessMask = 0;
-		swapChainToCompute.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-		swapChainToCompute.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-		swapChainToCompute.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-		swapChainToCompute.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		swapChainToCompute.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		swapChainToCompute.image = this->swapChain->getImage(nextSwapChainIndex);
-		swapChainToCompute.subresourceRange = range;
+		VkImageMemoryBarrier waitForClear;
+		waitForClear.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		waitForClear.pNext = nullptr;
+		waitForClear.srcAccessMask = 0;
+		waitForClear.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
+		waitForClear.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+		waitForClear.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+		waitForClear.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		waitForClear.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		waitForClear.image = this->computeImage;
+		waitForClear.subresourceRange = range;
 
 
 		vkCmdPipelineBarrier(
@@ -452,9 +450,8 @@ namespace RaytracerRenderer {
 			0, // no dependencies
 			0, nullptr, // no memory barriers
 			0, nullptr, // no buffer memory barriers
-			1, &swapChainToCompute // 1 imageMemoryBarrier
+			1, &waitForClear // 1 imageMemoryBarrier
 		);
-		*/
 
 		this->raytracePipeline->bind(commandBuffer);
 		vkCmdBindDescriptorSets(
@@ -468,8 +465,34 @@ namespace RaytracerRenderer {
 			nullptr
 		);
 		VkExtent2D imageSize = this->swapChain->getSwapChainExtent();
-		vkCmdDispatch(commandBuffer, (imageSize.width), (imageSize.height), this->raysPerPixel);
 
+		vkCmdDispatch(commandBuffer, (imageSize.width / 32) + 1, (imageSize.height / 32) + 1, 1); // assume once cause doesn't make much sense to go below that
+		// and need barrier between each dispatch but not before or after all 
+		for (auto i = 1; i < this->raysPerPixel; i++) {
+			VkImageMemoryBarrier waitForLastTraceSet; // wait for each previous set of rays to get done before starting the next
+			waitForLastTraceSet.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+			waitForLastTraceSet.pNext = nullptr;
+			waitForLastTraceSet.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
+			waitForLastTraceSet.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
+			waitForLastTraceSet.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+			waitForLastTraceSet.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+			waitForLastTraceSet.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			waitForLastTraceSet.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			waitForLastTraceSet.image = this->computeImage;
+			waitForLastTraceSet.subresourceRange = range;
+			vkCmdPipelineBarrier(
+				commandBuffer,
+				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, // src stage
+				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, // dst stage
+				0, // no dependencies
+				0, nullptr, // no memory barriers
+				0, nullptr, // no buffer memory barriers
+				1, &waitForLastTraceSet // 1 imageMemoryBarrier
+			);
+			vkCmdDispatch(commandBuffer, imageSize.width, imageSize.height, 1);
+		}
+
+		// TODO sync2: https://github.com/KhronosGroup/Vulkan-Docs/wiki/Synchronization-Examples#dispatch-writes-into-a-storage-image-draw-samples-that-image-in-a-fragment-shader
 		VkImageMemoryBarrier computeToPresent;
 		computeToPresent.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 		computeToPresent.pNext = nullptr;
