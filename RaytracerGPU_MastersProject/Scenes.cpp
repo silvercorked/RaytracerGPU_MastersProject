@@ -261,13 +261,13 @@ auto cornellBoxScene(std::unique_ptr<RaytraceScene>& scene) -> void {
 
 	GameObject cube1 = GameObject::createGameObject();
 	cube1.setModel(cubeWhite, true);
-	cube1.transform.translation = { 425.0f, 160.f, 295.0f };
+	cube1.transform.translation = { 350.0f, 160.f, 395.0f };
 	cube1.transform.scale = { 80.0f, 160.0f, 80.0f };
 	cube1.transform.rotation = { 0, glm::radians(15.0f), 0};
 
 	GameObject cube2 = GameObject::createGameObject();
 	cube2.setModel(cubeWhite, true);
-	cube2.transform.translation = { 150.0f, 80.0f, 265.0f };
+	cube2.transform.translation = { 180.0f, 80.0f, 175.0f };
 	cube2.transform.scale = { 80.0f, 80.0f, 80.0f };
 	cube2.transform.rotation = { 0, glm::radians(-18.0f), 0 };
 
@@ -280,7 +280,7 @@ auto cornellBoxScene(std::unique_ptr<RaytraceScene>& scene) -> void {
 	dummySphere.transform.translation = { -50000, -50000, -50000 }; // requires 1 sphere min rn, so just throw this out of the way
 	scene->addGameObject(std::move(dummySphere));
 
-	scene->setMaxRaytraceDepth(50);
+	scene->setMaxRaytraceDepth(100);
 	scene->getCamera().setVerticalFOV(40.0f);
 	scene->prepForRender();
 }

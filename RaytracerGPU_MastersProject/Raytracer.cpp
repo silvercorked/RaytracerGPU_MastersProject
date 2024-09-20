@@ -404,7 +404,7 @@ namespace RaytracerRenderer {
 		reset.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 		reset.pNext = nullptr;
 		reset.srcAccessMask = 0;
-		reset.dstAccessMask = 0;
+		reset.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
 		reset.oldLayout = firstRun ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		reset.newLayout = VK_IMAGE_LAYOUT_GENERAL;
 		reset.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -415,14 +415,12 @@ namespace RaytracerRenderer {
 		vkCmdPipelineBarrier(
 			commandBuffer,
 			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, // src stage
-			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, // dst stage
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, // dst stage
 			0, // no dependencies
 			0, nullptr, // no memory barriers
 			0, nullptr, // no buffer memory barriers
 			1, &reset // 1 imageMemoryBarrier
 		);
-
-
 
 		VkClearColorValue clearValue = { 0.0f, 0.0f, 0.0f, 1.0f };
 		vkCmdClearColorImage(
@@ -433,7 +431,7 @@ namespace RaytracerRenderer {
 		VkImageMemoryBarrier waitForClear;
 		waitForClear.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 		waitForClear.pNext = nullptr;
-		waitForClear.srcAccessMask = 0;
+		waitForClear.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
 		waitForClear.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
 		waitForClear.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
 		waitForClear.newLayout = VK_IMAGE_LAYOUT_GENERAL;
@@ -442,10 +440,9 @@ namespace RaytracerRenderer {
 		waitForClear.image = this->computeImage;
 		waitForClear.subresourceRange = range;
 
-
 		vkCmdPipelineBarrier(
 			commandBuffer,
-			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, // src stage
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, // src stage
 			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, // dst stage
 			0, // no dependencies
 			0, nullptr, // no memory barriers
@@ -453,6 +450,7 @@ namespace RaytracerRenderer {
 			1, &waitForClear // 1 imageMemoryBarrier
 		);
 
+		VkExtent2D imageSize = this->swapChain->getSwapChainExtent();
 		this->raytracePipeline->bind(commandBuffer);
 		vkCmdBindDescriptorSets(
 			commandBuffer,
@@ -464,15 +462,13 @@ namespace RaytracerRenderer {
 			0,
 			nullptr
 		);
-		VkExtent2D imageSize = this->swapChain->getSwapChainExtent();
-
 		vkCmdDispatch(commandBuffer, (imageSize.width / 32) + 1, (imageSize.height / 32) + 1, 1); // assume once cause doesn't make much sense to go below that
 		// and need barrier between each dispatch but not before or after all 
 		for (auto i = 1; i < this->raysPerPixel; i++) {
 			VkImageMemoryBarrier waitForLastTraceSet; // wait for each previous set of rays to get done before starting the next
 			waitForLastTraceSet.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 			waitForLastTraceSet.pNext = nullptr;
-			waitForLastTraceSet.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
+			waitForLastTraceSet.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
 			waitForLastTraceSet.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
 			waitForLastTraceSet.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
 			waitForLastTraceSet.newLayout = VK_IMAGE_LAYOUT_GENERAL;
@@ -489,7 +485,8 @@ namespace RaytracerRenderer {
 				0, nullptr, // no buffer memory barriers
 				1, &waitForLastTraceSet // 1 imageMemoryBarrier
 			);
-			vkCmdDispatch(commandBuffer, imageSize.width, imageSize.height, 1);
+			
+			vkCmdDispatch(commandBuffer, (imageSize.width / 32) + 1, (imageSize.height / 32) + 1, 1);
 		}
 
 		// TODO sync2: https://github.com/KhronosGroup/Vulkan-Docs/wiki/Synchronization-Examples#dispatch-writes-into-a-storage-image-draw-samples-that-image-in-a-fragment-shader

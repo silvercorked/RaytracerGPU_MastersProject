@@ -353,7 +353,7 @@ namespace RaytracerRenderer {
 	public:
 		Raytracer();
 		auto mainLoop() -> void {
-			this->raysPerPixel = 1;
+			this->raysPerPixel = 20;
 			auto currentTime = std::chrono::high_resolution_clock::now();
 
 			VkFenceCreateInfo fenceInfo{};

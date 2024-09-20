@@ -2,7 +2,7 @@
 // from https://github.com/grigoryoskin/vulkan-compute-ray-tracing/blob/master/resources/shaders/source/include/random.glsl
 
 /*
-	If included, including file must contain a uniform buffer object called ubo with a currentSample uint property
+	If included, including file must contain a uniform buffer object called ubo with a randomState
 */
 
 const float pi = 3.1415926535897932385;
@@ -31,8 +31,10 @@ float random(float min, float max) {
 }
 
 vec3 randomInUnitSphere() {
-	vec3 p = vec3(random(-0.3, 0.3), random(-0.3, 0.3), random(-0.3, 0.3));
-	return normalize(p);
+	float rho = random();
+	float theta = random(0, 2 * pi);
+	float phi = random(0, pi);
+	return vec3(rho * sin(phi) * cos(theta), rho * sin(phi) * sin(theta), rho * cos(phi));
 }
 vec3 randomInHemisphere(vec3 normal) {
 	vec3 inUnitSphere = randomInUnitSphere();
@@ -54,4 +56,7 @@ vec3 randomInUnitDisk() {
 	float theta = random(0, 2 * pi);
 	float r = random(0, 1);
 	return vec3(r * cos(theta), r * sin(theta), 0);
+}
+vec3 randomUnitVector() {
+	return normalize(randomInUnitSphere());
 }
