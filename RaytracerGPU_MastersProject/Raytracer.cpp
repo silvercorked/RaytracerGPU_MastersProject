@@ -25,7 +25,8 @@ namespace RaytracerRenderer {
 
 		vkDestroyFence(this->device.device(), this->computeComplete, nullptr);
 
-		this->uniformBuffer = nullptr; // deconstruct uniformBuffer
+		this->rayUniformBuffer = nullptr; // deconstruct uniformBuffer
+		this->fragUniformBuffer = nullptr;
 		// scene handles deconstructing ssbos // deconstruct ssbos
 		this->modelToWorldDescriptorSetLayout = nullptr;
 		this->raytraceDescriptorSetLayout = nullptr; // deconstruct descriptorSetLayout
@@ -109,6 +110,12 @@ namespace RaytracerRenderer {
 		this->graphicsDescriptorSetLayout = DescriptorSetLayout::Builder(this->device)
 			.addBinding(
 				0,
+				VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+				VK_SHADER_STAGE_FRAGMENT_BIT,
+				1
+			)
+			.addBinding(
+				1,
 				VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
 				VK_SHADER_STAGE_FRAGMENT_BIT,
 				1
@@ -167,8 +174,8 @@ namespace RaytracerRenderer {
 		imageInfo.extent.depth = 1;
 		imageInfo.mipLevels = 1;
 		imageInfo.arrayLayers = 1;
-		imageInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
-		imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+		imageInfo.format = VK_FORMAT_R32G32B32A32_SFLOAT; //VK_FORMAT_R8G8B8A8_UNORM;
+		imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL; // using sfloat to additively store multiple ray colors in same location
 		imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 		imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -186,7 +193,7 @@ namespace RaytracerRenderer {
 		viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 		viewInfo.image = this->computeImage;
 		viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-		viewInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+		viewInfo.format = VK_FORMAT_R32G32B32A32_SFLOAT;
 		viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		viewInfo.subresourceRange.baseMipLevel = 0;
 		viewInfo.subresourceRange.levelCount = 1;
@@ -273,16 +280,25 @@ namespace RaytracerRenderer {
 		cornellBoxScene(this->scene);
 	}
 
-	auto Raytracer::createUniformBuffers() -> void { // just 1
-		VkDeviceSize bufferSize = sizeof(RaytracerRenderer::UniformBufferObject);
-		this->uniformBuffer = std::make_unique<Buffer>(
+	auto Raytracer::createUniformBuffers() -> void {
+		VkDeviceSize bufferSizeRT = sizeof(RaytracerRenderer::RaytracingUniformBufferObject);
+		this->rayUniformBuffer = std::make_unique<Buffer>(
 			this->device,
-			bufferSize,
+			bufferSizeRT,
 			1,
 			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT, //TODO remove transfer src. there only for debugging
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
 		);
-		this->uniformBuffer->map();
+		this->rayUniformBuffer->map();
+		VkDeviceSize bufferSizeFrag = sizeof(RaytracerRenderer::FragmentUniformBufferObject);
+		this->fragUniformBuffer = std::make_unique<Buffer>(
+			this->device,
+			bufferSizeFrag,
+			1,
+			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+		);
+		this->fragUniformBuffer->map();
 	}
 
 	auto Raytracer::createComputeDescriptorPool() -> void {
@@ -303,7 +319,7 @@ namespace RaytracerRenderer {
 	auto Raytracer::createComputeDescriptorSets() -> void {
 		this->modelToWorldDescriptorSets.resize(1);
 		this->raytraceDescriptorSets.resize(1);
-		auto uboBufferInfo = this->uniformBuffer->descriptorInfo();
+		auto uboBufferInfo = this->rayUniformBuffer->descriptorInfo();
 		auto ssboModelBufferInfo = this->scene->getModelBuffer()->descriptorInfo();
 		auto ssboTriangleBufferInfo = this->scene->getTriangleBuffer()->descriptorInfo();
 		auto ssboSphereBufferInfo = this->scene->getSphereBuffer()->descriptorInfo();
@@ -334,18 +350,22 @@ namespace RaytracerRenderer {
 	auto Raytracer::createGraphicsDescriptorPool() -> void {
 		this->graphicsDescriptorPool = DescriptorPool::Builder(this->device)
 			.setMaxSets(1)
+			.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1)
 			.addPoolSize(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1)
 			.build();
 	}
 	auto Raytracer::createGraphicsDescriptorSets() -> void {
 		this->graphicsDescriptorSets.resize(1);
+		auto uboBufferInfo = this->fragUniformBuffer->descriptorInfo();
+
 		VkDescriptorImageInfo descImageInfo{};
 		descImageInfo.sampler = this->fragmentShaderImageSampler;
 		descImageInfo.imageView = this->computeImageView;
 		descImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 		DescriptorWriter(*this->graphicsDescriptorSetLayout, *this->graphicsDescriptorPool)
-			.writeImage(0, &descImageInfo)
+			.writeBuffer(0, &uboBufferInfo)
+			.writeImage(1, &descImageInfo)
 			.build(this->graphicsDescriptorSets[0]);
 	}
 

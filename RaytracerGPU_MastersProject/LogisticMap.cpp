@@ -260,6 +260,7 @@ namespace LogisticMapRenderer {
 	auto LogisticMap::createGraphicsDescriptorPool() -> void {
 		this->graphicsDescriptorPool = DescriptorPool::Builder(this->device)
 			.setMaxSets(1)
+			.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1)
 			.addPoolSize(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1)
 			.build();
 	}

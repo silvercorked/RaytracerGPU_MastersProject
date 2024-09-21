@@ -27,7 +27,7 @@
 #include "VulkanWrapper/SceneTypes.hpp"
 
 namespace RaytracerRenderer {
-	struct UniformBufferObject {
+	struct RaytracingUniformBufferObject {
 		alignas(16) glm::vec3 camPos;
 		alignas(16) glm::vec3 camLookAt;
 		alignas(16) glm::vec3 camUpDir;
@@ -38,6 +38,9 @@ namespace RaytracerRenderer {
 		u32 numLights;
 		u32 maxRayTraceDepth;
 		u32 randomState;
+	};
+	struct FragmentUniformBufferObject {
+		u32 raysPerPixel; // used in gamma correction
 	};
 
 	class Raytracer {
@@ -74,7 +77,8 @@ namespace RaytracerRenderer {
 		std::unique_ptr<Buffer> scratchBuffer;
 
 		// createUniformBuffers
-		std::unique_ptr<Buffer> uniformBuffer;
+		std::unique_ptr<Buffer> rayUniformBuffer;
+		std::unique_ptr<Buffer> fragUniformBuffer;
 
 		// createDesciptorPool
 		std::unique_ptr<DescriptorPool> modelToWorldDescriptorPool;
@@ -279,25 +283,28 @@ namespace RaytracerRenderer {
 			this->recordComputeCommandBuffer(this->computeCommandBuffers[frameIndex], imageIndex);
 			this->recordGraphicsCommandBuffer(this->graphicsCommandBuffer, imageIndex);
 
-			RaytracerRenderer::UniformBufferObject nUbo{};
-			//nUbo.camPos = glm::vec3(0.0f, 1.0f, 0.0f);
-			//nUbo.camDir = glm::vec3(0.0f, -1.0f, 1.0f);
-			nUbo.camPos = glm::vec3(275.0f, 275.0f, -800.0f); //glm::vec3(250.0f, 250.0f, -800.0f);
-			nUbo.camLookAt = glm::vec3(275.0f, 275.0f, 0.0f);
-			nUbo.camUpDir = glm::vec3(0.0, 1.0f, 0.0f);
-			nUbo.verticalFOV = this->scene->getCamera().getVerticalFOV();
-			nUbo.numTriangles = this->scene->getTriangleCount();
-			nUbo.numSpheres = this->scene->getSphereCount();
-			nUbo.numMaterials = this->scene->getMaterialCount();
-			nUbo.numLights = this->scratchSize;
-			nUbo.maxRayTraceDepth = this->scene->getMaxRaytraceDepth();
-			nUbo.randomState = this->gen();
-			this->uniformBuffer->writeToBuffer(&nUbo);
-			this->uniformBuffer->flush(); // make visible to device
+			RaytracerRenderer::RaytracingUniformBufferObject rUbo{};
+			rUbo.camPos = glm::vec3(275.0f, 275.0f, -800.0f);
+			rUbo.camLookAt = glm::vec3(275.0f, 275.0f, 0.0f);
+			rUbo.camUpDir = glm::vec3(0.0, 1.0f, 0.0f);
+			rUbo.verticalFOV = this->scene->getCamera().getVerticalFOV();
+			rUbo.numTriangles = this->scene->getTriangleCount();
+			rUbo.numSpheres = this->scene->getSphereCount();
+			rUbo.numMaterials = this->scene->getMaterialCount();
+			rUbo.numLights = this->scratchSize;
+			rUbo.maxRayTraceDepth = this->scene->getMaxRaytraceDepth();
+			rUbo.randomState = this->gen();
+			this->rayUniformBuffer->writeToBuffer(&rUbo);
+			this->rayUniformBuffer->flush(); // make visible to device
+
+			RaytracerRenderer::FragmentUniformBufferObject fUbo{};
+			fUbo.raysPerPixel = this->raysPerPixel;
+			this->fragUniformBuffer->writeToBuffer(&fUbo);
+			this->fragUniformBuffer->flush();
 
 			if constexpr (Config::ShowBufferDebug) {
-				auto resultFromGPU = this->DEBUGgetDeployedBufferAs<RaytracerRenderer::UniformBufferObject>(
-					this->uniformBuffer->getBuffer(),
+				auto resultFromGPU = this->DEBUGgetDeployedBufferAs<RaytracerRenderer::RaytracingUniformBufferObject>(
+					this->rayUniformBuffer->getBuffer(),
 					1
 				);
 				std::cout << std::format(
@@ -353,7 +360,7 @@ namespace RaytracerRenderer {
 	public:
 		Raytracer();
 		auto mainLoop() -> void {
-			this->raysPerPixel = 20;
+			this->raysPerPixel = 200;
 			auto currentTime = std::chrono::high_resolution_clock::now();
 
 			VkFenceCreateInfo fenceInfo{};

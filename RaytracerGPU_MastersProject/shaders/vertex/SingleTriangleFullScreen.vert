@@ -12,4 +12,6 @@ out gl_PerVertex {
 void main() { // https://www.saschawillems.de/blog/2016/08/13/vulkan-tutorial-on-rendering-a-fullscreen-quad-without-buffers/
 	outUV = vec2((gl_VertexIndex << 1) & 2, gl_VertexIndex & 2);
 	gl_Position = vec4(outUV * 2.0f - 1.0f, 0.0f, 1.0f);
+	// basically, this using the vertex indecies (0, 1, & 2) to generate three verticies to form a triangle which
+	// entirely contains the viewport rectangle.
 }

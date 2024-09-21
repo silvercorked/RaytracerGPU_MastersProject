@@ -196,7 +196,7 @@ auto cornellMixedScene(std::unique_ptr<RaytraceScene>& scene) -> void {
 
 	scene->addGameObject(std::move(sphere1));
 
-	scene->setMaxRaytraceDepth(10);
+	scene->setMaxRaytraceDepth(100);
 	scene->getCamera().setVerticalFOV(80.0f);
 	scene->prepForRender();
 }
@@ -205,7 +205,7 @@ auto cornellBoxScene(std::unique_ptr<RaytraceScene>& scene) -> void {
 	SceneTypes::Material redDiff(glm::vec3(0.65, 0.05, 0.05), SceneTypes::MaterialType::DIFFUSE);
 	SceneTypes::Material whiteDiff(glm::vec3(0.73, 0.73, 0.73), SceneTypes::MaterialType::DIFFUSE);
 	SceneTypes::Material greenDiff(glm::vec3(0.12, 0.45, 0.15), SceneTypes::MaterialType::DIFFUSE);
-	SceneTypes::Material light(glm::vec3(1.0, 1.0, 1.0), SceneTypes::MaterialType::LIGHT);
+	SceneTypes::Material light(glm::vec3(15.0, 15.0, 15.0), SceneTypes::MaterialType::LIGHT);
 
 	std::shared_ptr<RTModel> quadRed = loadModel("models/quad.obj", redDiff);
 	std::shared_ptr<RTModel> quadGreen = loadModel("models/quad.obj", greenDiff);
@@ -240,6 +240,7 @@ auto cornellBoxScene(std::unique_ptr<RaytraceScene>& scene) -> void {
 	bottomWall.setModel(quadWhite, true);
 	bottomWall.transform = t; // copy
 	bottomWall.transform.translation = { 275.0f, 0.0f, 275.0f };
+	bottomWall.transform.rotation = { 0, 0, 0 };
 
 	GameObject topWall = GameObject::createGameObject();
 	topWall.setModel(quadWhite, true);
@@ -280,7 +281,7 @@ auto cornellBoxScene(std::unique_ptr<RaytraceScene>& scene) -> void {
 	dummySphere.transform.translation = { -50000, -50000, -50000 }; // requires 1 sphere min rn, so just throw this out of the way
 	scene->addGameObject(std::move(dummySphere));
 
-	scene->setMaxRaytraceDepth(100);
+	scene->setMaxRaytraceDepth(50);
 	scene->getCamera().setVerticalFOV(40.0f);
 	scene->prepForRender();
 }

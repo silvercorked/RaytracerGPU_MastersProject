@@ -47,7 +47,7 @@ Stretch Goals/Extra Goals:
 
 
 TODO:
-- setup sending multiple ray casts per pixel in one image
+//- setup sending multiple ray casts per pixel in one image
 - add ONB (orthonormal basis) class/utilities and BRDF
 - BVH & other optimizations
 - use swapchain right to avoid stalling gpu work while updating gameobjects, waiting for image clear, waiting for modelToWorld, waiting for raytrace
