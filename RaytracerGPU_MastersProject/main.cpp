@@ -1,28 +1,16 @@
 
-#include <cstdlib>
-#include <iostream>
-#include <stdexcept>
+#include "Config.hpp"
 
-import BifurcationPlotter1D;
+#include "LogisticMap.hpp"
+#include "Raytracer.hpp"
 
 int main() {
-    BifurcationPlotter1D graph{};
-
-    /*
-    Bitmap bmp;
-    bmp.create(500, 500);
-    bmp.clear(0);
-    bmp.saveBitmap("black_bmp.bmp");
-    */
-    /*
-    engine::Raytracer tracer{};
-    try {
-        tracer.run();
-    }
-    catch (const std::exception& e) {
-        std::cerr << e.what() << std::endl;
-        return EXIT_FAILURE;
-    }
-    return EXIT_SUCCESS;
-    */
+	if constexpr (Config::CurrentProgram == Config::Programs::LogisticMap) {
+		LogisticMapRenderer::LogisticMap comp{};
+		comp.mainLoop();
+	}
+	else if constexpr (Config::CurrentProgram == Config::Programs::Raytracer) {
+		RaytracerRenderer::Raytracer comp{};
+		comp.mainLoop();
+	}
 }

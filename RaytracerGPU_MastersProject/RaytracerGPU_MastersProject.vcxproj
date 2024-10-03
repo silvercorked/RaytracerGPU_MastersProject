@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -139,22 +139,74 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Raytracer.cpp" />
+    <ClCompile Include="Scenes.cpp" />
+    <ClCompile Include="utils\Bitmap.cpp" />
+    <ClCompile Include="LogisticMap.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="VulkanWrapper\abstract\Pipeline.cpp" />
+    <ClCompile Include="VulkanWrapper\abstract\Pipeline.hpp" />
+    <ClCompile Include="VulkanWrapper\Buffer.cpp" />
+    <ClCompile Include="VulkanWrapper\Buffer.hpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="Bitmap.ixx" />
-    <ClCompile Include="BifurcationPlotter1D.ixx" />
-    <ClCompile Include="PrimitiveTypes.ixx" />
-    <ClCompile Include="VulkanComputeHelper.ixx" />
+    <ClCompile Include="utils\Bitmap.hpp" />
+    <ClCompile Include="utils\PrimitiveTypes.hpp" />
+    <ClCompile Include="LogisticMap.hpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="VulkanWrapper\Camera.cpp" />
+    <ClCompile Include="VulkanWrapper\Camera.hpp" />
+    <ClCompile Include="VulkanWrapper\CameraGameObject.cpp" />
+    <ClCompile Include="VulkanWrapper\components\TransformComponent.cpp" />
+    <ClCompile Include="VulkanWrapper\ComputePipeline.cpp" />
+    <ClCompile Include="VulkanWrapper\ComputePipeline.hpp" />
+    <ClCompile Include="VulkanWrapper\Descriptors.cpp" />
+    <ClCompile Include="VulkanWrapper\Descriptors.hpp" />
+    <ClCompile Include="VulkanWrapper\Device.cpp" />
+    <ClCompile Include="VulkanWrapper\Device.hpp" />
+    <ClCompile Include="VulkanWrapper\GameObject.cpp" />
+    <ClCompile Include="VulkanWrapper\KeyboardMovementController.cpp" />
+    <ClCompile Include="VulkanWrapper\Model.cpp" />
+    <ClCompile Include="VulkanWrapper\Model.hpp" />
+    <ClCompile Include="VulkanWrapper\GraphicsPipeline.cpp" />
+    <ClCompile Include="VulkanWrapper\GraphicsPipeline.hpp" />
+    <ClCompile Include="VulkanWrapper\Renderer.cpp" />
+    <ClCompile Include="VulkanWrapper\Renderer.hpp" />
+    <ClCompile Include="VulkanWrapper\RaytraceScene.cpp" />
+    <ClCompile Include="VulkanWrapper\RaytraceScene.hpp" />
+    <ClCompile Include="VulkanWrapper\RTModel.cpp" />
+    <ClCompile Include="VulkanWrapper\SwapChain.cpp" />
+    <ClCompile Include="VulkanWrapper\SwapChain.hpp" />
+    <ClCompile Include="VulkanWrapper\utils.hpp" />
+    <ClCompile Include="VulkanWrapper\Window.cpp" />
+    <ClCompile Include="VulkanWrapper\Window.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="compile.bat" />
     <None Include="shaders\compute\logistic.comp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="BifurcationPlotter1D.hpp" />
+    <None Include="shaders\compute\ModelSpaceToWorldSpace.comp" />
+    <None Include="shaders\compute\raytrace.comp" />
+    <None Include="shaders\fragment\SingleTriangleFullScreen.frag" />
+    <None Include="shaders\include\definitions.glsl" />
+    <None Include="shaders\include\random.glsl" />
+    <None Include="shaders\vertex\SingleTriangleFullScreen.vert" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="Plan.txt" />
     <Text Include="README.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Config.hpp" />
+    <ClInclude Include="Raytracer.hpp" />
+    <ClInclude Include="Scenes.hpp" />
+    <ClInclude Include="VulkanWrapper\CameraGameObject.hpp" />
+    <ClInclude Include="VulkanWrapper\components\PointLightComponent.hpp" />
+    <ClInclude Include="VulkanWrapper\components\TransformComponent.hpp" />
+    <ClInclude Include="VulkanWrapper\GameObject.hpp" />
+    <ClInclude Include="VulkanWrapper\KeyboardMovementController.hpp" />
+    <ClInclude Include="VulkanWrapper\RTModel.hpp" />
+    <ClInclude Include="VulkanWrapper\SceneTypes.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
