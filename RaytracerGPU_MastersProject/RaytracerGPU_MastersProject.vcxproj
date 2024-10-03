@@ -194,7 +194,6 @@
   </ItemGroup>
   <ItemGroup>
     <Text Include="Plan.txt" />
-    <Text Include="README.txt" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Config.hpp" />
