@@ -195,7 +195,6 @@ vec3 rayColor(inout Ray r) {
 	vec3 globalAttenuation = vec3(1);
 	vec3 unitDir = normalize(r.direction);
 	Ray curr = { r.origin, unitDir };
-	bool emits;
 	for (uint i = 0; i < ubo.maxRayTraceDepth; i++) {
 		if (!sceneHit(curr, rec)) {
 			color += _BACKGROUND_COLOR * globalAttenuation;
@@ -256,7 +255,6 @@ void main() { // gl_GlobalInvocationID.xy represents pixel locations
 	stepRNG(rngState);
 	float nextRandom = random();// alpha is ignored in fragment shader, so use it to store random
 		// this let's successive rays out of the same pixel with the same ubo.randomstate behavior differently // float 0-1
-
 	Ray r = getRay(gl_GlobalInvocationID.xy);
 	// cuda core (nvinda) or SM, task (1M pixels per screen, only ~4000 per fancy gpus)
 	// get ray color

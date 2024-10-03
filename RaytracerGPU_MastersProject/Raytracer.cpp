@@ -484,7 +484,7 @@ namespace RaytracerRenderer {
 		);
 		vkCmdDispatch(commandBuffer, (imageSize.width / 32) + 1, (imageSize.height / 32) + 1, 1); // assume once cause doesn't make much sense to go below that
 		// and need barrier between each dispatch but not before or after all 
-		for (auto i = 1; i < this->raysPerPixel; i++) {
+		for (auto i = 1; i < this->scene->getRaysPerPixel(); i++) {
 			VkImageMemoryBarrier waitForLastTraceSet; // wait for each previous set of rays to get done before starting the next
 			waitForLastTraceSet.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 			waitForLastTraceSet.pNext = nullptr;

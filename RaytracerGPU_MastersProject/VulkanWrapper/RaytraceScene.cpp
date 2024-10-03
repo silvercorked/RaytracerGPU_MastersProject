@@ -25,8 +25,16 @@ auto RaytraceScene::setMaxRaytraceDepth(u32 depth) -> void {
 	this->maxRaytraceDepth = depth;
 }
 
+auto RaytraceScene::setRaysPerPixel(u32 raysPerPixel) -> void {
+	this->raysPerPixel = raysPerPixel;
+}
+
 auto RaytraceScene::getMaxRaytraceDepth() -> u32 {
 	return this->maxRaytraceDepth;
+}
+
+auto RaytraceScene::getRaysPerPixel() -> u32 {
+	return this->raysPerPixel;
 }
 
 auto RaytraceScene::getCamera() -> CameraGameObject& {

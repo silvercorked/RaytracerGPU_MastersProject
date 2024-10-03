@@ -98,10 +98,11 @@ namespace RaytracerRenderer {
 
 		// mainLoop -> doIteration
 		u32 iteration;
-		u32 raysPerPixel;
 
 		std::mt19937 gen{ static_cast<u32>(std::chrono::system_clock::now().time_since_epoch().count()) };
 		const f32 scratchSize = 20;
+
+		std::vector<std::vector<std::chrono::microseconds>> times;
 
 		auto initVulkan() -> void {
 			/* Device
@@ -298,7 +299,7 @@ namespace RaytracerRenderer {
 			this->rayUniformBuffer->flush(); // make visible to device
 
 			RaytracerRenderer::FragmentUniformBufferObject fUbo{};
-			fUbo.raysPerPixel = this->raysPerPixel;
+			fUbo.raysPerPixel = this->scene->getRaysPerPixel();
 			this->fragUniformBuffer->writeToBuffer(&fUbo);
 			this->fragUniformBuffer->flush();
 
@@ -360,7 +361,6 @@ namespace RaytracerRenderer {
 	public:
 		Raytracer();
 		auto mainLoop() -> void {
-			this->raysPerPixel = 200;
 			auto currentTime = std::chrono::high_resolution_clock::now();
 
 			VkFenceCreateInfo fenceInfo{};
@@ -369,16 +369,55 @@ namespace RaytracerRenderer {
 			if (vkCreateFence(this->device.device(), &fenceInfo, nullptr, &this->computeComplete) != VK_SUCCESS)
 				throw std::runtime_error("failed to create fence");
 
+			if constexpr (Config::RunRayPerPixelIncreasingDemo) {
+				this->scene->setRaysPerPixel(Config::RayPerPixelIncreasingDemoConfig::startRaysPerPixel);
+			}
+
 			while (!this->window.shouldClose()) {
 				glfwPollEvents();
 				auto newTime = std::chrono::high_resolution_clock::now();
-				float frameTime = std::chrono::duration<float, std::chrono::milliseconds::period>(newTime - currentTime).count();
+				auto frameTime = std::chrono::duration_cast<std::chrono::microseconds>(newTime - currentTime);
 				currentTime = newTime;
-				std::cout << "Frame Time: " << frameTime << std::endl;
-				doIteration(frameTime);
+				std::cout << "Frame Time(us): " << frameTime
+					<< " RaysPerPixel: " << this->scene->getRaysPerPixel()
+					<< " Depth: " << this->scene->getMaxRaytraceDepth()
+					<< std::endl;
+				doIteration(std::chrono::duration<float, std::chrono::microseconds::period>(frameTime).count());
+				
+				if constexpr (Config::RunRayPerPixelIncreasingDemo) {
+					if (this->iteration != 0) {
+						u32 index = (this->iteration - 1) / Config::RayPerPixelIncreasingDemoConfig::runsBeforeIncrease;
+						if (this->scene->getRaysPerPixel() > Config::RayPerPixelIncreasingDemoConfig::maxRaysPerPixel) {
+							break;
+						}
+						if (this->times.size() == index) {
+							this->times.push_back(std::vector<std::chrono::microseconds>{frameTime});
+						}
+						else {
+							this->times[index].push_back(frameTime);
+						}
+						if (this->iteration % Config::RayPerPixelIncreasingDemoConfig::runsBeforeIncrease == 0) {
+							this->scene->setRaysPerPixel(this->scene->getRaysPerPixel() + Config::RayPerPixelIncreasingDemoConfig::increaseAmount);
+						}
+					}
+				}
+
 				this->iteration++;
 			}
 			vkDeviceWaitIdle(this->device.device());
+
+			if constexpr (Config::RunRayPerPixelIncreasingDemo) {
+				std::ofstream out;
+				out.open("runtimes.csv", std::ios::out | std::ios::trunc);
+				for (auto i = 0; i < this->times.size(); i++) {
+					std::chrono::microseconds sum = this->times[i].at(0); // assumes at least 1
+					for (auto j = 1; j < Config::RayPerPixelIncreasingDemoConfig::runsBeforeIncrease; j++) {
+						sum += this->times[i][j];
+					}
+					out << (i + 1) << ", " << sum / Config::RayPerPixelIncreasingDemoConfig::runsBeforeIncrease << ",\n";
+				}
+				out.close();
+			}
 		}
 		~Raytracer();
 	};

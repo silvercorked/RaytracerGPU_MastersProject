@@ -281,6 +281,7 @@ auto cornellBoxScene(std::unique_ptr<RaytraceScene>& scene) -> void {
 	dummySphere.transform.translation = { -50000, -50000, -50000 }; // requires 1 sphere min rn, so just throw this out of the way
 	scene->addGameObject(std::move(dummySphere));
 
+	scene->setRaysPerPixel(10);
 	scene->setMaxRaytraceDepth(50);
 	scene->getCamera().setVerticalFOV(40.0f);
 	scene->prepForRender();

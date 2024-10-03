@@ -57,6 +57,7 @@ class RaytraceScene {
 	//u32 lightCount;
 
 	u32 maxRaytraceDepth;
+	u32 raysPerPixel;
 	// some methods throw runtime errors if called before buffers are set
 	bool buffersCreated;
 
@@ -71,7 +72,9 @@ public:
 	auto draw(VkCommandBuffer commandBuffer) -> void;
 
 	auto setMaxRaytraceDepth(u32) -> void;
+	auto setRaysPerPixel(u32) -> void;
 	auto getMaxRaytraceDepth() -> u32;
+	auto getRaysPerPixel() -> u32;
 
 	auto getCamera() -> CameraGameObject&;
 
