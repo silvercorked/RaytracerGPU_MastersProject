@@ -139,7 +139,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Raytracer.cpp" />
+    <ClCompile Include="RaytracerBVH.cpp" />
     <ClCompile Include="Scenes.cpp" />
     <ClCompile Include="utils\Bitmap.cpp" />
     <ClCompile Include="LogisticMap.cpp">
@@ -184,6 +184,8 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="compile.bat" />
+    <None Include="shaders\compute\ConstructAABBs.comp" />
+    <None Include="shaders\compute\GenerateMortonCodesOfAABBs.comp" />
     <None Include="shaders\compute\logistic.comp" />
     <None Include="shaders\compute\ModelSpaceToWorldSpace.comp" />
     <None Include="shaders\compute\raytrace.comp" />
@@ -197,8 +199,11 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Config.hpp" />
-    <ClInclude Include="Raytracer.hpp" />
+    <ClInclude Include="RaytracerBVH.hpp" />
     <ClInclude Include="Scenes.hpp" />
+    <ClInclude Include="utils\Concepts.hpp" />
+    <ClInclude Include="utils\Functors.hpp" />
+    <ClInclude Include="utils\Functions.hpp" />
     <ClInclude Include="VulkanWrapper\CameraGameObject.hpp" />
     <ClInclude Include="VulkanWrapper\components\PointLightComponent.hpp" />
     <ClInclude Include="VulkanWrapper\components\TransformComponent.hpp" />

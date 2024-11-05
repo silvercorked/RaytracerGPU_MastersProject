@@ -94,7 +94,7 @@ namespace SceneTypes {
 			}
 		};
 		struct Light {
-			float area;
+			f32 area;
 			u32 triangleIndex;
 
 			constexpr auto getSize() const -> const VkDeviceSize { return sizeof(SceneTypes::GPU::Light); }
@@ -104,6 +104,19 @@ namespace SceneTypes {
 					&& this->triangleIndex == other.triangleIndex;
 			}
 		};
+		struct AABB {
+			alignas(16) glm::vec3 center;
+			alignas(16) f32 minX; f32 maxX;
+			f32 minY; f32 maxY;
+			f32 minZ; f32 maxZ;
+			u32 index;
+			u32 primitiveType; // 0 -> sphere, 1 -> triangle
+		};
+		struct MortonPrimitive {
+			u32 code;
+			u32 aabbIndex;
+		};
 	};
+
 	using Material = SceneTypes::GPU::Material;
 };

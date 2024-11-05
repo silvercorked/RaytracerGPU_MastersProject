@@ -101,6 +101,8 @@ public:
 	auto getMaterialCount() -> u32;
 	//auto getLightCount() -> u32;
 
+	auto findEnclosingAABB(const std::vector<SceneTypes::GPU::AABB>&) -> std::pair<glm::vec3, glm::vec3>;
+
 private:
 	auto createBuffers() -> void;
 	auto moveGameObjectsToHostVectors() -> void;

@@ -15,7 +15,7 @@ void main() {
 	vec3 corrected = clamp(
 		sqrt(uncorrected / float(ubo.raysPerPixel))
 		, 0.0, 1.0
-	); // finishing gamma correction for gamma=2
+	); // finishing gamma correction for gamma=1/2
 
 	fragColor = vec4(corrected, 1.0);
 }

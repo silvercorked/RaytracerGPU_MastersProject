@@ -1,0 +1,75 @@
+#version 450
+
+layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
+
+#include "../include/definitions.glsl"
+
+layout(binding = 0) uniform ParameterUBO {
+	vec4 camPos; // ignore w
+	vec4 camLookAt; // ignore w
+	vec4 camUpDir; // ignore w
+	float verticalFOV;
+	uint numTriangles;
+	uint numSpheres;
+	uint numMaterials;
+	uint numLights;
+	uint maxRayTraceDepth;
+	uint randomState;
+} ubo;
+
+layout(binding = 1) uniform EnclosingAABBUBO {
+	vec4 eMin;
+	vec4 eMax;
+} enclosingAABB;
+
+layout(std430, binding = 2) buffer AABBBufferObject {
+	AABB aabbs[ ];
+};
+layout(std430, binding = 3) buffer MortonPrimitivesBufferObject {
+	MortonPrimitive mortonPrimitives[ ];
+};
+
+const uint MORTON_BITS = 10;
+const uint MORTON_SCALE = 1 << MORTON_BITS;
+
+uint seperateBitsBy3(in uint val) { // seperates 10 bits in LSBs so they are each seperated by 2 unused bits
+	if (val == MORTON_SCALE) {
+		val--;
+	}
+	val = (val | (val << 16)) & 50331903;	// 0b 0000 0011  0000 0000  0000 0000  1111 1111
+	val = (val | (val << 8)) & 50393103;	// 0b 0000 0011  0000 0000  1111 0000  0000 1111
+	val = (val | (val << 4)) & 51130563;	// 0b 0000 0011  0000 1100  0011 0000  1100 0011
+	val = (val | (val << 2)) & 153391689;	// 0b 0000 1001  0010 0100  1001 0010  0100 1001
+	return val;
+}
+
+uint mortonCode3D(in uvec3 quantizedCoord) {
+	return (
+		seperateBitsBy3(quantizedCoord.z) << 2 |
+		seperateBitsBy3(quantizedCoord.y) << 1 |
+		seperateBitsBy3(quantizedCoord.x)
+	);
+}
+
+uvec3 quantizeForMorton(in vec3 coord) {
+	vec3 locWithin = coord - enclosingAABB.eMin.xyz;
+	vec3 span = enclosingAABB.eMax.xyz - enclosingAABB.eMin.xyz;
+	vec3 offset = coord / span; // offset is 0.0-1.0 scale for xyz within enclosing box
+	return uvec3(offset * MORTON_SCALE); // rescale to morton and cut off decimals
+}
+
+// vkCmdDispatch(commandBuffer, ((numTriangles + numSpheres) / 32) + 1, 1, 1);
+void main() {
+	uint i = gl_GlobalInvocationID.x;
+	if (i < ubo.numTriangles + ubo.numSpheres) {
+		MortonPrimitive mp;
+		AABB box = aabbs[i];
+
+		uvec3 quantizedCoord = quantizeForMorton(box.center.xyz);
+		
+		mp.code = mortonCode3D(quantizedCoord);
+		mp.aabbIndex = i;
+		
+		mortonPrimitives[i] = mp;
+	}
+}

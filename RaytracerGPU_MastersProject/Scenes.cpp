@@ -275,10 +275,10 @@ auto cornellBoxScene(std::unique_ptr<RaytraceScene>& scene) -> void {
 	scene->addGameObject(std::move(cube1));
 	scene->addGameObject(std::move(cube2));
 
-	std::shared_ptr<RTModel> sphere = loadModel(1.0f, whiteDiff);
+	std::shared_ptr<RTModel> sphere = loadModel(40.0f, whiteDiff);
 	GameObject dummySphere = GameObject::createGameObject();
 	dummySphere.setModel(sphere, false);
-	dummySphere.transform.translation = { -50000, -50000, -50000 }; // requires 1 sphere min rn, so just throw this out of the way
+	dummySphere.transform.translation = { -2000.0f, -3000.0f, -2500.0f }; // requires 1 sphere min rn, so just throw this out of the way
 	scene->addGameObject(std::move(dummySphere));
 
 	scene->setRaysPerPixel(128);

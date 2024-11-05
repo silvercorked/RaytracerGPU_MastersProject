@@ -49,7 +49,24 @@ struct HitRecord {
 	float v;
 };
 
+struct AABB {
+	vec4 center;
+	float minX; float maxX;
+	float minY; float maxY;
+	float minZ; float maxZ;
+	uint index;
+	uint primitiveType;
+};
+
+struct MortonPrimitive {
+	uint code;
+	uint aabbIndex;
+};
+
 #define LIGHT_MATERIAL 0
 #define DIFFUSE_MATERIAL 1
 #define METALLIC_MATERIAL 2
 #define DIELECTRIC_MATERIAL 3
+
+#define SPHERE_PRIMITIVE 0
+#define TRIANGLE_PRIMITIVE 1

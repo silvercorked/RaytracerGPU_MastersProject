@@ -1,0 +1,100 @@
+#version 450
+
+layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
+
+#include "../include/definitions.glsl"
+
+layout(binding = 0) uniform ParameterUBO {
+	vec4 camPos; // ignore w
+	vec4 camLookAt; // ignore w
+	vec4 camUpDir; // ignore w
+	float verticalFOV;
+	uint numTriangles;
+	uint numSpheres;
+	uint numMaterials;
+	uint numLights;
+	uint maxRayTraceDepth;
+	uint randomState;
+} ubo;
+
+layout(std430, binding = 1) buffer TriangleBufferObject {
+	Triangle triangles[ ];
+};
+layout(std430, binding = 2) buffer SpheresBufferObject {
+	Sphere spheres[ ];
+};
+layout(std430, binding = 3) buffer AABBBufferObject {
+	AABB aabbs[ ];
+};
+
+/*
+struct AABB {
+	float minX; float maxX;
+	float minY; float maxY;
+	float minZ; float maxZ;
+	uint index;
+	uint primitiveType;
+};
+*/
+
+const float DELTA = 0.001;
+const float PADDING = DELTA / 2;
+
+void padAABB(inout AABB box) {
+	if (box.maxX - box.minX < DELTA) {
+		box.minX -= PADDING;
+		box.maxX += PADDING;
+	}
+	if (box.maxY - box.minY < DELTA) {
+		box.minY -= PADDING;
+		box.maxY += PADDING;
+	}
+	if (box.maxZ - box.minZ < DELTA) {
+		box.minZ -= PADDING;
+		box.maxZ += PADDING;
+	}
+}
+
+void main() {
+	AABB box;
+	uint i = gl_GlobalInvocationID.x;
+	if (i < ubo.numTriangles) {
+		Triangle t = triangles[i];
+		vec4 outerPoint = t.v0 + (t.v1 - t.v0) + (t.v2 - t.v0);
+		box.minX = min(t.v0.x, outerPoint.x);
+		box.maxX = max(t.v0.x, outerPoint.x);
+		box.minY = min(t.v0.y, outerPoint.y);
+		box.maxY = max(t.v0.y, outerPoint.y);
+		box.minZ = min(t.v0.z, outerPoint.z);
+		box.maxZ = max(t.v0.z, outerPoint.z);
+		box.primitiveType = TRIANGLE_PRIMITIVE;
+	}
+	else if (i < ubo.numTriangles + ubo.numSpheres) { // processSphere, if result is false, was an extra dispatch to fit 32 size work groups and can be ignored
+		AABB box;
+		i = i - ubo.numTriangles; // get right index
+		Sphere s = spheres[i];
+		vec3 radiusVec = s.radius.xxx; // fancy swizzling
+		vec3 l = s.center.xyz - s.radius;
+		vec3 r = s.center.xyz + s.radius;
+		box.minX = min(l.x, r.x);
+		box.maxX = min(l.x, r.x);
+		box.minY = min(l.y, r.y);
+		box.maxY = min(l.y, r.y);
+		box.minZ = min(l.z, r.z);
+		box.maxZ = min(l.z, r.z);
+		box.primitiveType = SPHERE_PRIMITIVE;
+	}
+
+	if (i < ubo.numTriangles + ubo.numSpheres) { // only work within num of primitives
+		box.index = i; // sphere part reassigns i to right value, so can remove from if statements
+		padAABB(box);
+		box.center = vec4(
+			box.minX + (box.maxX - box.minX) / 2,
+			box.minY + (box.maxY - box.minY) / 2,
+			box.minZ + (box.maxZ - box.minZ) / 2,
+			0
+		);
+		aabbs[i] = box;
+	}
+	
+}

@@ -2,6 +2,8 @@
 #include "RaytraceScene.hpp"
 
 #include "utils.hpp"
+#include "../utils/Functions.hpp"
+#include "../utils/Functors.hpp"
 
 #include <variant>
 #include <memory>
@@ -142,6 +144,21 @@ auto RaytraceScene::getMaterialCount() -> u32 {
 	return this->materialCount;
 }
 
+auto RaytraceScene::findEnclosingAABB(const std::vector<SceneTypes::GPU::AABB>& aabbs) -> std::pair<glm::vec3, glm::vec3> {
+	std::pair<glm::vec3, glm::vec3> out = { glm::vec3(std::numeric_limits<f32>::max()), glm::vec3(std::numeric_limits<f32>::lowest()) };
+	
+	for (auto i = 0; i < aabbs.size(); i++) {
+		out.first.x = Util::min<f32>(out.first.x, aabbs[i].center.x);
+		out.second.x = Util::max<f32>(out.second.x, aabbs[i].center.x);
+		out.first.y = Util::min<f32>(out.first.y, aabbs[i].center.y);
+		out.second.y = Util::max<f32>(out.second.y, aabbs[i].center.y);
+		out.first.z = Util::min<f32>(out.first.z, aabbs[i].center.z);
+		out.second.z = Util::max<f32>(out.second.z, aabbs[i].center.z);
+	}
+
+	return out;
+}
+
 auto RaytraceScene::createBuffers() -> void {
 	this->moveGameObjectsToHostVectors();
 	this->createModelBuffer();
@@ -190,10 +207,11 @@ auto RaytraceScene::moveGameObjectsToHostVectors() -> void {
 			);
 		}
 	}
-	this->modelCount = static_cast<u32>(this->models.size());
-	this->triangleCount = static_cast<u32>(this->triangles.size());
-	this->sphereCount = static_cast<u32>(this->spheres.size());
-	this->materialCount = static_cast<u32>(this->materials.size());
+	this->modelCount = static_cast<u32>(glm::max<size_t>(this->models.size(), 1));
+	this->triangleCount = static_cast<u32>(glm::max<size_t>(this->triangles.size(), 1));
+	this->sphereCount = static_cast<u32>(glm::max<size_t>(this->spheres.size(), 1));
+	this->materialCount = static_cast<u32>(glm::max<size_t>(this->materials.size(), 1));
+	// need min 1 to allocate. if 1 is allocated and none present, works fine, just ignores extra allocated space till used
 }
 
 auto RaytraceScene::createModelBuffer() -> void {
