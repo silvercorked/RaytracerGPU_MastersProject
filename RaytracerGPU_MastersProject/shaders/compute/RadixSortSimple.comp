@@ -43,7 +43,7 @@ shared uint[BINS / SUBGROUP_SIZE] subgroupReductions;
 shared uint[BINS] localIndexOffsets; // prefix sums inside subgroupShuffle
 shared uint[BINS] globalIndexOffsets; // prefix sums
 
-struct BinIndexingFlags {
+struct BinIndexingFlags { // used to figure out available locations within bins
 	uint locationInfo[WORKGROUP_SIZE / BITS];
 };
 shared BinIndexingFlags[BINS] binIndexingFlags;
@@ -126,6 +126,7 @@ void main() {
 				binID = uint(elem.code >> shift) & bitMask;
 				binOffset = globalIndexOffsets[binID]; // get bin offset
 				atomicAdd(binIndexingFlags[binID].locationInfo[indexFlagBin], indexFlagBit);
+				// indexFlagBit within indexFlagBin is a unique location. On add, actually just sets a bit
 			}
 
 			barrier();
@@ -139,7 +140,9 @@ void main() {
 					const uint partialCount = bitCount(bits & indexFlagBitMask);
 					interBinOffset += (i < indexFlagBin) ? fullCount : 0U;
 					interBinOffset += (i == indexFlagBin) ? partialCount : 0U;
-					count += fullCount;
+					// if we aren't in the right set of binIndexingFlags, count all the spots that fill be used (fullCount) and continue
+					// else, if we are at the right set of binIndexingFlags, count only the spots before that will be used
+					count += fullCount; // keep track of the full count to modify globalIndexOffsets for next iteration
 				}
 				if (iteration % 2 == 0) {
 					mortonPrimitives2[binOffset + interBinOffset] = elem;
