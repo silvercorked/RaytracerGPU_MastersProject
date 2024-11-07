@@ -24,6 +24,7 @@
 
 #include <format>
 #include <stdexcept>
+#include <bitset>
 #include "VulkanWrapper/SceneTypes.hpp"
 
 namespace RaytracerBVHRenderer {
@@ -59,6 +60,7 @@ namespace RaytracerBVHRenderer {
 		std::unique_ptr<DescriptorSetLayout> modelToWorldDescriptorSetLayout;
 		std::unique_ptr<DescriptorSetLayout> constructAABBDescriptorSetLayout;
 		std::unique_ptr<DescriptorSetLayout> generateMortonCodeDescriptorSetLayout;
+		std::unique_ptr<DescriptorSetLayout> radixSortDescriptorSetLayout;
 		//std::unique_ptr<DescriptorSetLayout> raytraceDescriptorSetLayout;
 		//std::unique_ptr<DescriptorSetLayout> graphicsDescriptorSetLayout;
 
@@ -66,10 +68,12 @@ namespace RaytracerBVHRenderer {
 		std::unique_ptr<ComputePipeline> modelToWorldPipeline;
 		std::unique_ptr<ComputePipeline> constructAABBPipeline;
 		std::unique_ptr<ComputePipeline> generateMortonCodePipeline;
+		std::unique_ptr<ComputePipeline> radixSortComputePipeline;
 		//std::unique_ptr<ComputePipeline> raytracePipeline;
 		VkPipelineLayout modelToWorldPipelineLayout;
 		VkPipelineLayout constructAABBPipelineLayout;
 		VkPipelineLayout generateMortonCodePipelineLayout;
+		VkPipelineLayout radixSortPipelineLayout;
 		//VkPipelineLayout raytracePipelineLayout;
 
 		// createComputeImage
@@ -87,7 +91,8 @@ namespace RaytracerBVHRenderer {
 		std::unique_ptr<Buffer> scratchBuffer;
 		// temp buffers for debugging
 		std::unique_ptr<Buffer> AABBBuffer;
-		std::unique_ptr<Buffer> mortonPrimitiveBuffer;
+		std::unique_ptr<Buffer> mortonPrimitiveBuffer1;
+		std::unique_ptr<Buffer> mortonPrimitiveBuffer2;
 
 		// createUniformBuffers
 		std::unique_ptr<Buffer> rayUniformBuffer;
@@ -98,6 +103,7 @@ namespace RaytracerBVHRenderer {
 		std::unique_ptr<DescriptorPool> modelToWorldDescriptorPool;
 		std::unique_ptr<DescriptorPool> constructAABBDescriptorPool;
 		std::unique_ptr<DescriptorPool> generateMortonCodeDescriptorPool;
+		std::unique_ptr<DescriptorPool> radixSortDescriptorPool;
 		//std::unique_ptr<DescriptorPool> raytraceDescriptorPool;
 		//std::unique_ptr<DescriptorPool> graphicsDescriptorPool;
 
@@ -105,6 +111,7 @@ namespace RaytracerBVHRenderer {
 		std::vector<VkDescriptorSet> modelToWorldDescriptorSets;
 		std::vector<VkDescriptorSet> constructAABBDescriptorSets;
 		std::vector<VkDescriptorSet> generateMortonCodeDescriptorSets;
+		std::vector<VkDescriptorSet> radixSortDescriptorSets;
 		//std::vector<VkDescriptorSet> raytraceDescriptorSets;
 		//std::vector<VkDescriptorSet> graphicsDescriptorSets;
 
@@ -396,7 +403,7 @@ namespace RaytracerBVHRenderer {
 			//
 
 			auto mortonPrimitives = this->DEBUGgetDeployedBufferAs<SceneTypes::GPU::MortonPrimitive>(
-				this->mortonPrimitiveBuffer->getBuffer(),
+				this->mortonPrimitiveBuffer2->getBuffer(),
 				this->scene->getTriangleCount() + this->scene->getSphereCount()
 			);
 
@@ -409,7 +416,7 @@ namespace RaytracerBVHRenderer {
 			for (auto i = 0; i < mortonPrimitives.size(); i++) {
 				SceneTypes::GPU::AABB aabb = AABBs[mortonPrimitives[i].aabbIndex];
 				std::cout << std::format(
-					"i: {}, aabbCenter({}, {}, {})\n\taabbMin({}, {}, {}), aabbMax({}, {}, {})\n\taabbIndex: {}, mortPrim: {}\n",
+					"i: {}, aabbCenter({}, {}, {})\n\taabbMin({}, {}, {}), aabbMax({}, {}, {})\n\taabbIndex: {}, mortPrim: 0b{:032b}\n",
 					i, aabb.center.x, aabb.center.y, aabb.center.z, aabb.minX, aabb.minY, aabb.minZ, aabb.maxX, aabb.maxY, aabb.maxZ,
 					mortonPrimitives[i].aabbIndex, mortonPrimitives[i].code
 				);

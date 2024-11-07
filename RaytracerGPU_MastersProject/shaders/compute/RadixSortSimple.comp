@@ -1,0 +1,156 @@
+#version 460
+
+// adapted from https://github.com/MircoWerner/VkRadixSort 's SingleRadixSort
+
+#extension GL_GOOGLE_include_directive: enable
+#extension GL_KHR_shader_subgroup_basic: enable
+#extension GL_KHR_shader_subgroup_arithmetic: enable
+
+#define WORKGROUP_SIZE 64 // workgroup_size must be greater than or equal to the number of bins
+#define BINS 64
+#define SUBGROUP_SIZE 32 // NVIDIA = 32, AMD = 64
+#define ITERATIONS 1 // 6 * 4 bits per -> upper 24 bits sorted
+#define BITS_PER_ITERATION 6
+#define BITS 32
+
+layout(local_size_x = WORKGROUP_SIZE) in;
+
+#include "../include/definitions.glsl"
+
+layout(binding = 0) uniform ParameterUBO {
+	vec4 camPos; // ignore w
+	vec4 camLookAt; // ignore w
+	vec4 camUpDir; // ignore w
+	float verticalFOV;
+	uint numTriangles;
+	uint numSpheres;
+	uint numMaterials;
+	uint numLights;
+	uint maxRayTraceDepth;
+	uint randomState;
+} ubo;
+
+layout(std430, binding = 1) buffer MortonPrimitivesBufferObject1 {
+	MortonPrimitive mortonPrimitives1[ ];
+};
+
+layout(std430, binding = 2) buffer MortonPrimitivesBufferObject2 {
+	MortonPrimitive mortonPrimitives2[ ];
+};
+
+shared uint[BINS] histogram;
+shared uint[BINS / SUBGROUP_SIZE] subgroupReductions;
+shared uint[BINS] localIndexOffsets; // prefix sums inside subgroupShuffle
+shared uint[BINS] globalIndexOffsets; // prefix sums
+
+struct BinIndexingFlags {
+	uint locationInfo[WORKGROUP_SIZE / BITS];
+};
+shared BinIndexingFlags[BINS] binIndexingFlags;
+
+#define GET_INPUT_ELEMENT(index, iteration) (iteration % 2 == 0 ? mortonPrimitives1[index] : mortonPrimitives2[index])
+
+void main() {
+	uint workGroupInvoID = gl_LocalInvocationID.x;
+	uint subGroupID = gl_SubgroupID;
+	uint subGroupInvoId = gl_SubgroupInvocationID;
+	const uint primitiveCount = ubo.numTriangles + ubo.numSpheres;
+	const uint bitMask = BINS - 1;
+
+	for (uint iteration = 0; iteration < ITERATIONS; iteration++) {
+		uint shift = BITS_PER_ITERATION * iteration;
+
+		// init histogram bins counts
+		if (workGroupInvoID < BINS) {
+			histogram[workGroupInvoID] = 0U;
+		}
+
+		barrier(); // super cool function that makes a runtime barrier within a workgroup
+
+		// go through primitives, get bin they will be in and add to histogram counts to figure out bin sizes later
+		for (uint elemIndex = workGroupInvoID; elemIndex < primitiveCount; elemIndex += WORKGROUP_SIZE) { // jump through primitives array
+			const uint bin = uint(GET_INPUT_ELEMENT(elemIndex, iteration).code >> shift) & bitMask; // get bin via shift and mask
+			atomicAdd(histogram[bin], 1U); // add to bin safely
+		}
+
+		barrier();
+
+		// subgroup/local reductions and prefix sums; will be combined later for global
+		if (workGroupInvoID < BINS) {
+			uint histogramCount = histogram[workGroupInvoID];
+			uint sum = subgroupAdd(histogramCount); // get sum of subgroup's data for this variable
+			uint prefixSum = subgroupExclusiveAdd(histogramCount); // get sum of subgroup but only add those with lower invocation id
+			localIndexOffsets[workGroupInvoID] = prefixSum;
+			if (subgroupElect()) { // pick one in subgroup to do this
+				subgroupReductions[subGroupID] = sum;
+			}
+		}
+
+		barrier();
+
+		// find global prefix sums to figure out indexes where buckets start
+		if (subGroupID == 0) { // this might be improvable, not sure why we can't use workGroupInvoID < BINS and just do all at once instead of a for loop
+			uint indexOffset = 0;
+			for (uint i = subGroupInvoId; i < BINS; i += SUBGROUP_SIZE) {
+				globalIndexOffsets[i] = indexOffset + localIndexOffsets[i];
+				indexOffset += subgroupReductions[i / SUBGROUP_SIZE];
+			}
+		}
+
+		barrier();
+
+		// copy keys according to global offsets
+		const uint indexFlagBin = workGroupInvoID / BITS;
+		const uint indexFlagBit = 1 << (workGroupInvoID % BITS); // the combo of these uniquely identifies a bit in binIndexingFlag[BINID].locationInfo[indexFlagBin] & (1 << indexFlagBit)
+		const uint indexFlagBitMask = indexFlagBit - 1;
+
+		for (uint blockID = 0; blockID < primitiveCount; blockID += WORKGROUP_SIZE) {
+			barrier();
+
+			const uint ID = blockID + workGroupInvoID;
+
+			// initialize and reset bin indexing flags
+			if (workGroupInvoID < BINS) {
+				for (uint i = 0; i < WORKGROUP_SIZE / BITS; i++) {
+					binIndexingFlags[workGroupInvoID].locationInfo[i] = 0U;
+				}
+			}
+
+			barrier();
+
+			MortonPrimitive elem;
+			uint binID = 0;
+			uint binOffset = 0;
+			if (ID < primitiveCount) {
+				elem = GET_INPUT_ELEMENT(ID, iteration);
+				binID = uint(elem.code >> shift) & bitMask;
+				binOffset = globalIndexOffsets[binID]; // get bin offset
+				atomicAdd(binIndexingFlags[binID].locationInfo[indexFlagBin], indexFlagBit);
+			}
+
+			barrier();
+
+			if (ID < primitiveCount) { // calculate output index and copy
+				uint interBinOffset = 0;
+				uint count = 0;
+				for (uint i = 0; i < WORKGROUP_SIZE / BITS; i++) {
+					const uint bits = binIndexingFlags[binID].locationInfo[i];
+					const uint fullCount = bitCount(bits);
+					const uint partialCount = bitCount(bits & indexFlagBitMask);
+					interBinOffset += (i < indexFlagBin) ? fullCount : 0U;
+					interBinOffset += (i == indexFlagBin) ? partialCount : 0U;
+					count += fullCount;
+				}
+				if (iteration % 2 == 0) {
+					mortonPrimitives2[binOffset + interBinOffset] = elem;
+				}
+				else {
+					mortonPrimitives1[binOffset + interBinOffset] = elem;
+				}
+				if (interBinOffset == count - 1) {
+					atomicAdd(globalIndexOffsets[binID], count);
+				}
+			}
+		}
+	}
+}

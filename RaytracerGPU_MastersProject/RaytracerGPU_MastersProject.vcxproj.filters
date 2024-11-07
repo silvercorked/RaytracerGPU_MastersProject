@@ -143,6 +143,7 @@
     <None Include="shaders\compute\ModelSpaceToWorldSpace.comp" />
     <None Include="shaders\compute\ConstructAABBs.comp" />
     <None Include="shaders\compute\GenerateMortonCodesOfAABBs.comp" />
+    <None Include="shaders\compute\RadixSortSimple.comp" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="Plan.txt" />

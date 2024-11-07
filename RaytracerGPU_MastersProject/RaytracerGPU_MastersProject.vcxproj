@@ -188,6 +188,7 @@
     <None Include="shaders\compute\GenerateMortonCodesOfAABBs.comp" />
     <None Include="shaders\compute\logistic.comp" />
     <None Include="shaders\compute\ModelSpaceToWorldSpace.comp" />
+    <None Include="shaders\compute\RadixSortSimple.comp" />
     <None Include="shaders\compute\raytrace.comp" />
     <None Include="shaders\fragment\SingleTriangleFullScreen.frag" />
     <None Include="shaders\include\definitions.glsl" />

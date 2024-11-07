@@ -117,6 +117,23 @@ namespace RaytracerBVHRenderer {
 				VK_SHADER_STAGE_COMPUTE_BIT,
 				1
 			).build();
+		this->radixSortDescriptorSetLayout = DescriptorSetLayout::Builder(this->device)
+			.addBinding(
+				0,
+				VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+				VK_SHADER_STAGE_COMPUTE_BIT,
+				1
+			).addBinding(
+				1,
+				VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+				VK_SHADER_STAGE_COMPUTE_BIT,
+				1
+			).addBinding(
+				2,
+				VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+				VK_SHADER_STAGE_COMPUTE_BIT,
+				1
+			).build();
 		/*
 		this->raytraceDescriptorSetLayout = DescriptorSetLayout::Builder(this->device)
 			.addBinding(
@@ -198,6 +215,15 @@ namespace RaytracerBVHRenderer {
 		if (vkCreatePipelineLayout(this->device.device(), &pipelineLayoutInfo3, nullptr, &this->generateMortonCodePipelineLayout) != VK_SUCCESS)
 			throw std::runtime_error("failed to create compute pipeline layout!");
 
+		VkDescriptorSetLayout tempRadixSort = this->radixSortDescriptorSetLayout->getDescriptorSetLayout();
+		VkPipelineLayoutCreateInfo pipelineLayoutInfo4{};
+		pipelineLayoutInfo4.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+		pipelineLayoutInfo4.setLayoutCount = 1;
+		pipelineLayoutInfo4.pSetLayouts = &tempRadixSort;
+
+		if (vkCreatePipelineLayout(this->device.device(), &pipelineLayoutInfo4, nullptr, &this->radixSortPipelineLayout) != VK_SUCCESS)
+			throw std::runtime_error("failed to create compute pipeline layout!");
+
 		/*
 		VkDescriptorSetLayout tempRaytrace = this->raytraceDescriptorSetLayout->getDescriptorSetLayout();
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo2{};
@@ -239,6 +265,17 @@ namespace RaytracerBVHRenderer {
 			this->generateMortonCodePipeline = std::make_unique<ComputePipeline>(
 				this->device,
 				"shaders/compiled/GenerateMortonCodesOfAABBs.comp.spv",
+				pipelineConfig
+			);
+		}
+
+		{
+			ComputePipelineConfigInfo pipelineConfig{};
+			ComputePipeline::defaultPipelineConfigInfo(pipelineConfig);
+			pipelineConfig.pipelineLayout = this->radixSortPipelineLayout;
+			this->radixSortComputePipeline = std::make_unique<ComputePipeline>(
+				this->device,
+				"shaders/compiled/RadixSortSimple.comp.spv",
 				pipelineConfig
 			);
 		}
@@ -382,7 +419,14 @@ namespace RaytracerBVHRenderer {
 			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT, // is ssbo and will transfer into
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
 		);
-		this->mortonPrimitiveBuffer = std::make_unique<Buffer>(
+		this->mortonPrimitiveBuffer1 = std::make_unique<Buffer>(
+			this->device,
+			sizeof(SceneTypes::GPU::MortonPrimitive),
+			this->scene->getTriangleCount() + this->scene->getSphereCount(),
+			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT, // is ssbo and will transfer into
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+		);
+		this->mortonPrimitiveBuffer2 = std::make_unique<Buffer>(
 			this->device,
 			sizeof(SceneTypes::GPU::MortonPrimitive),
 			this->scene->getTriangleCount() + this->scene->getSphereCount(),
@@ -443,6 +487,12 @@ namespace RaytracerBVHRenderer {
 			.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2)
 			.addPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2)
 			.build();
+
+		this->radixSortDescriptorPool = DescriptorPool::Builder(this->device)
+			.setMaxSets(1)
+			.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1)
+			.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2)
+			.build();
 		/*
 		this->raytraceDescriptorPool = DescriptorPool::Builder(this->device)
 			.setMaxSets(1)
@@ -457,6 +507,7 @@ namespace RaytracerBVHRenderer {
 		this->modelToWorldDescriptorSets.resize(1);
 		this->constructAABBDescriptorSets.resize(1);
 		this->generateMortonCodeDescriptorSets.resize(1);
+		this->radixSortDescriptorSets.resize(1);
 		//this->raytraceDescriptorSets.resize(1);
 		auto uboBufferInfo = this->rayUniformBuffer->descriptorInfo();
 		auto uniformEnclosingAABBBufferInfo = this->enclosingAABBUniformBuffer->descriptorInfo();
@@ -466,7 +517,8 @@ namespace RaytracerBVHRenderer {
 		auto ssboMaterialBufferInfo = this->scene->getMaterialBuffer()->descriptorInfo();
 		auto ssboScratchBufferInfo = this->scratchBuffer->descriptorInfo();
 		auto ssboAABBBufferInfo = this->AABBBuffer->descriptorInfo();
-		auto ssboMortonBufferInfo = this->mortonPrimitiveBuffer->descriptorInfo();
+		auto ssboMortonBufferInfo1 = this->mortonPrimitiveBuffer1->descriptorInfo();
+		auto ssboMortonBufferInfo2 = this->mortonPrimitiveBuffer2->descriptorInfo();
 
 		/*
 		VkDescriptorImageInfo descImageInfo{};
@@ -493,8 +545,14 @@ namespace RaytracerBVHRenderer {
 			.writeBuffer(0, &uboBufferInfo)
 			.writeBuffer(1, &uniformEnclosingAABBBufferInfo)
 			.writeBuffer(2, &ssboAABBBufferInfo)
-			.writeBuffer(3, &ssboMortonBufferInfo)
+			.writeBuffer(3, &ssboMortonBufferInfo1)
 			.build(this->generateMortonCodeDescriptorSets[0]);
+
+		DescriptorWriter(*this->radixSortDescriptorSetLayout, *this->radixSortDescriptorPool)
+			.writeBuffer(0, &uboBufferInfo)
+			.writeBuffer(1, &ssboMortonBufferInfo1)
+			.writeBuffer(2, &ssboMortonBufferInfo2)
+			.build(this->radixSortDescriptorSets[0]);
 
 		/*
 		DescriptorWriter(*this->raytraceDescriptorSetLayout, *this->raytraceDescriptorPool)
@@ -668,6 +726,43 @@ namespace RaytracerBVHRenderer {
 			nullptr
 		);
 		vkCmdDispatch(commandBuffer, ((this->scene->getTriangleCount() + this->scene->getSphereCount()) / 32) + 1, 1, 1);
+
+		VkBufferMemoryBarrier mortonCodeBarrier;
+		mortonCodeBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+		mortonCodeBarrier.pNext = nullptr;
+		mortonCodeBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+		mortonCodeBarrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+		mortonCodeBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		mortonCodeBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		mortonCodeBarrier.buffer = this->mortonPrimitiveBuffer1->getBuffer();
+		mortonCodeBarrier.offset = 0;
+		mortonCodeBarrier.size = VK_WHOLE_SIZE;
+
+		vkCmdPipelineBarrier(
+			commandBuffer,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			0,
+			0,
+			nullptr,
+			1,
+			&mortonCodeBarrier,
+			0,
+			nullptr
+		);
+
+		this->radixSortComputePipeline->bind(commandBuffer);
+		vkCmdBindDescriptorSets(
+			commandBuffer,
+			VK_PIPELINE_BIND_POINT_COMPUTE,
+			this->radixSortPipelineLayout,
+			0,
+			1,
+			&this->radixSortDescriptorSets[0],
+			0,
+			nullptr
+		);
+		vkCmdDispatch(commandBuffer, 64, 1, 1);
 
 		/*
 		VkImageMemoryBarrier reset;
