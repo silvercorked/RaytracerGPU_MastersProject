@@ -6,12 +6,12 @@
 #extension GL_KHR_shader_subgroup_basic: enable
 #extension GL_KHR_shader_subgroup_arithmetic: enable
 
-#define WORKGROUP_SIZE 64 // workgroup_size must be greater than or equal to the number of bins
-#define BINS 64
+#define WORKGROUP_SIZE 256 // workgroup_size must be greater than or equal to the number of bins
+#define BINS 256
 #define SUBGROUP_SIZE 32 // NVIDIA = 32, AMD = 64
-#define ITERATIONS 5 // 6 * 5 bits per -> lower 30 bits sorted (only use lower 30)
-#define BITS_PER_ITERATION 6
-#define BITS 30
+#define ITERATIONS 4 // 6 * 5 bits per -> lower 30 bits sorted (only use lower 30)
+#define BITS_PER_ITERATION 8
+#define BITS 32
 
 layout(local_size_x = WORKGROUP_SIZE) in;
 

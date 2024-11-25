@@ -27,16 +27,6 @@ layout(std430, binding = 3) buffer AABBBufferObject {
 	AABB aabbs[ ];
 };
 
-/*
-struct AABB {
-	float minX; float maxX;
-	float minY; float maxY;
-	float minZ; float maxZ;
-	uint index;
-	uint primitiveType;
-};
-*/
-
 const float DELTA = 0.001;
 const float PADDING = DELTA / 2;
 

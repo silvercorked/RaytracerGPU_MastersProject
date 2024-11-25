@@ -61,6 +61,7 @@ namespace RaytracerBVHRenderer {
 		std::unique_ptr<DescriptorSetLayout> constructAABBDescriptorSetLayout;
 		std::unique_ptr<DescriptorSetLayout> generateMortonCodeDescriptorSetLayout;
 		std::unique_ptr<DescriptorSetLayout> radixSortDescriptorSetLayout;
+		std::unique_ptr<DescriptorSetLayout> constructHLBVHDescriptorSetLayout;
 		//std::unique_ptr<DescriptorSetLayout> raytraceDescriptorSetLayout;
 		//std::unique_ptr<DescriptorSetLayout> graphicsDescriptorSetLayout;
 
@@ -69,11 +70,13 @@ namespace RaytracerBVHRenderer {
 		std::unique_ptr<ComputePipeline> constructAABBPipeline;
 		std::unique_ptr<ComputePipeline> generateMortonCodePipeline;
 		std::unique_ptr<ComputePipeline> radixSortComputePipeline;
+		std::unique_ptr<ComputePipeline> constructHLBVHComputePipeline;
 		//std::unique_ptr<ComputePipeline> raytracePipeline;
 		VkPipelineLayout modelToWorldPipelineLayout;
 		VkPipelineLayout constructAABBPipelineLayout;
 		VkPipelineLayout generateMortonCodePipelineLayout;
 		VkPipelineLayout radixSortPipelineLayout;
+		VkPipelineLayout constructHLBVHPipelineLayout;
 		//VkPipelineLayout raytracePipelineLayout;
 
 		// createComputeImage
@@ -93,6 +96,7 @@ namespace RaytracerBVHRenderer {
 		std::unique_ptr<Buffer> AABBBuffer;
 		std::unique_ptr<Buffer> mortonPrimitiveBuffer1;
 		std::unique_ptr<Buffer> mortonPrimitiveBuffer2;
+		std::unique_ptr<Buffer> HLBVHNodesBuffer;
 
 		// createUniformBuffers
 		std::unique_ptr<Buffer> rayUniformBuffer;
@@ -104,6 +108,7 @@ namespace RaytracerBVHRenderer {
 		std::unique_ptr<DescriptorPool> constructAABBDescriptorPool;
 		std::unique_ptr<DescriptorPool> generateMortonCodeDescriptorPool;
 		std::unique_ptr<DescriptorPool> radixSortDescriptorPool;
+		std::unique_ptr<DescriptorPool> constructHLBVHDescriptorPool;
 		//std::unique_ptr<DescriptorPool> raytraceDescriptorPool;
 		//std::unique_ptr<DescriptorPool> graphicsDescriptorPool;
 
@@ -112,6 +117,7 @@ namespace RaytracerBVHRenderer {
 		std::vector<VkDescriptorSet> constructAABBDescriptorSets;
 		std::vector<VkDescriptorSet> generateMortonCodeDescriptorSets;
 		std::vector<VkDescriptorSet> radixSortDescriptorSets;
+		std::vector<VkDescriptorSet> constructHLBVHDescriptorSets;
 		//std::vector<VkDescriptorSet> raytraceDescriptorSets;
 		//std::vector<VkDescriptorSet> graphicsDescriptorSets;
 
@@ -400,29 +406,44 @@ namespace RaytracerBVHRenderer {
 			if (waitForComputeResult2 != VK_SUCCESS)
 				throw std::runtime_error("failed to submit draw command buffer!");
 			
-			//
-
-			auto mortonPrimitives = this->DEBUGgetDeployedBufferAs<SceneTypes::GPU::MortonPrimitive>(
-				this->mortonPrimitiveBuffer2->getBuffer(),
-				this->scene->getTriangleCount() + this->scene->getSphereCount()
-			);
-
-			std::cout << std::format("Enclosing AABB: min({}, {}, {}), max({}, {}, {})",
-				minVec3.x, minVec3.y, minVec3.z,
-				maxVec3.x, maxVec3.y, maxVec3.z
-			);
-
-			std::cout << "morton Primitives:\n";
-			for (auto i = 0; i < mortonPrimitives.size(); i++) {
-				SceneTypes::GPU::AABB aabb = AABBs[mortonPrimitives[i].aabbIndex];
-				std::cout << std::format(
-					"i: {}, aabbCenter({}, {}, {})\n\taabbMin({}, {}, {}), aabbMax({}, {}, {})\n\taabbIndex: {}, mortPrim: 0b{:032b}\n",
-					i, aabb.center.x, aabb.center.y, aabb.center.z, aabb.minX, aabb.minY, aabb.minZ, aabb.maxX, aabb.maxY, aabb.maxZ,
-					mortonPrimitives[i].aabbIndex, mortonPrimitives[i].code
+			if constexpr (Config::ShowBufferDebug) {
+				auto mortonPrimitives = this->DEBUGgetDeployedBufferAs<SceneTypes::GPU::MortonPrimitive>(
+					this->mortonPrimitiveBuffer1->getBuffer(),
+					this->scene->getTriangleCount() + this->scene->getSphereCount()
 				);
-			}
+				std::cout << std::format("Enclosing AABB: min({}, {}, {}), max({}, {}, {})",
+					minVec3.x, minVec3.y, minVec3.z,
+					maxVec3.x, maxVec3.y, maxVec3.z
+				);
+				std::cout << "morton Primitives:\n";
+				for (auto i = 0; i < mortonPrimitives.size(); i++) {
+					SceneTypes::GPU::AABB aabb = AABBs[mortonPrimitives[i].aabbIndex];
+					std::cout << std::format(
+						"i: {}, aabbCenter({}, {}, {})\n\taabbMin({}, {}, {}), aabbMax({}, {}, {})\n\taabbIndex: {}, mortPrim: 0b{:032b}\n",
+						i, aabb.center.x, aabb.center.y, aabb.center.z, aabb.minX, aabb.minY, aabb.minZ, aabb.maxX, aabb.maxY, aabb.maxZ,
+						mortonPrimitives[i].aabbIndex, mortonPrimitives[i].code
+					);
+				}
 
-			//
+				auto bvhNodes = this->DEBUGgetDeployedBufferAs<SceneTypes::GPU::BVHNode>(
+					this->HLBVHNodesBuffer->getBuffer(),
+					this->scene->getTriangleCount() + this->scene->getSphereCount() + this->scene->getTriangleCount() + this->scene->getSphereCount() - 1
+				);
+
+				for (auto i = 0; i < bvhNodes.size(); i++) {
+					SceneTypes::GPU::BVHNode node = bvhNodes[i];
+					std::cout << std::format(
+						"i: {}, left: {}, right: {}, aabbIndex: {},\n\tnode_aabbMin({}, {}, {}), node_aabbMax({}, {}, {})\n",
+						i, node.left, node.right, node.aabbIndex, node.aabb.minX, node.aabb.minY, node.aabb.minZ, node.aabb.maxX, node.aabb.maxY, node.aabb.maxZ
+					);
+					if (node.left == 0 && node.right == 0) {
+						std::cout << std::format(
+							"\tLEAF NODE prim_id: {}, prim_type: {}\n",
+							AABBs[node.aabbIndex].index, (AABBs[node.aabbIndex].primitiveType == 0 ? "Sphere" : "Triangle")
+						);
+					}
+				}
+			}
 
 			vkResetFences(this->device.device(), 1, &this->computeS2Complete);
 

@@ -142,9 +142,6 @@
     <ClCompile Include="RaytracerBVH.cpp" />
     <ClCompile Include="Scenes.cpp" />
     <ClCompile Include="utils\Bitmap.cpp" />
-    <ClCompile Include="LogisticMap.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
-    </ClCompile>
     <ClCompile Include="VulkanWrapper\abstract\Pipeline.cpp" />
     <ClCompile Include="VulkanWrapper\abstract\Pipeline.hpp" />
     <ClCompile Include="VulkanWrapper\Buffer.cpp" />
@@ -152,9 +149,6 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="utils\Bitmap.hpp" />
     <ClCompile Include="utils\PrimitiveTypes.hpp" />
-    <ClCompile Include="LogisticMap.hpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
-    </ClCompile>
     <ClCompile Include="VulkanWrapper\Camera.cpp" />
     <ClCompile Include="VulkanWrapper\Camera.hpp" />
     <ClCompile Include="VulkanWrapper\CameraGameObject.cpp" />
@@ -185,11 +179,13 @@
   <ItemGroup>
     <None Include="compile.bat" />
     <None Include="shaders\compute\ConstructAABBs.comp" />
+    <None Include="shaders\compute\ConstructHLBVH.comp" />
     <None Include="shaders\compute\GenerateMortonCodesOfAABBs.comp" />
     <None Include="shaders\compute\logistic.comp" />
     <None Include="shaders\compute\ModelSpaceToWorldSpace.comp" />
     <None Include="shaders\compute\RadixSortSimple.comp" />
     <None Include="shaders\compute\raytrace.comp" />
+    <None Include="shaders\compute\raytraceBVH.comp" />
     <None Include="shaders\fragment\SingleTriangleFullScreen.frag" />
     <None Include="shaders\include\definitions.glsl" />
     <None Include="shaders\include\random.glsl" />

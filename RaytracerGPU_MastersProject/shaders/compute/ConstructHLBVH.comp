@@ -1,0 +1,155 @@
+#version 460
+
+#extension GL_GOOGLE_include_directive: enable
+
+#include "../include/definitions.glsl"
+
+layout(local_size_x = 256) in;
+
+layout(binding = 0) uniform ParameterUBO {
+	vec4 camPos; // ignore w
+	vec4 camLookAt; // ignore w
+	vec4 camUpDir; // ignore w
+	float verticalFOV;
+	uint numTriangles;
+	uint numSpheres;
+	uint numMaterials;
+	uint numLights;
+	uint maxRayTraceDepth;
+	uint randomState;
+} ubo;
+
+layout(std430, binding = 1) buffer AABBBufferObject {
+	AABB aabbs[ ];
+};
+layout(std430, binding = 2) buffer MortonPrimitivesBufferObject {
+	MortonPrimitive mortonPrimitives[ ];
+};
+layout(std430, binding = 3) buffer HLBVH {
+	HLBVHNode nodes[ ]; // Leaf + internal = num elems + num elements - 1
+};
+
+AABB combineAABB(in AABB a, in AABB b) {
+	AABB combined;
+	combined.minX = min(a.minX, b.minX);
+	combined.maxX = max(a.maxX, b.maxX);
+	combined.minY = min(a.minY, b.minY);
+	combined.maxY = max(a.maxY, b.maxY);
+	combined.minZ = min(a.minZ, b.minZ);
+	combined.maxZ = max(a.maxZ, b.maxZ);
+	return combined;
+}
+
+// returns the index of the most signficant bit of difference between mortoncodes for primitives at i and j
+// in other words, counts leading sames until first difference (counting leading zeroes till 1)
+int delta(int i, int j) {
+	if (j < 0 || j > (ubo.numTriangles + ubo.numSpheres) - 1) {
+		return -1;
+	}
+	uint codeI = mortonPrimitives[i].code;
+	uint codeJ = mortonPrimitives[j].code;
+	if (codeI == codeJ) { // duplicate mortoncodes
+		uint elemIdI = mortonPrimitives[i].aabbIndex;
+		uint elemIdJ = mortonPrimitives[j].aabbIndex;
+		return 32 + 31 - findMSB(elemIdI ^ elemIdJ);
+	}
+	return 31 - findMSB(codeI ^ codeJ);
+}
+
+void determineRange(int id, out int lower, out int upper) {
+	// determine direction of range
+	const uint code = mortonPrimitives[id].code;
+	const int deltaL = delta(id, id - 1);
+	const int deltaR = delta(id, id + 1);
+	const int dir = (deltaR >= deltaL) ? 1 : -1;
+	
+	// compute upper bound for length of range
+	const int deltaMin = min(deltaL, deltaR);
+	int lMax = 2;
+	while (delta(id, id + lMax * dir) > deltaMin) { // while difference in MSB is less than min, look further for bigger difference
+		lMax <<= 1;
+	}
+
+	// use binary search to find other end of range
+	int l = 0;
+	for (int t = lMax >> 1; t > 0; t >>= 1) { // if divide lMax by 2 and set 2.
+		if (delta(id, id + (l + t) * dir) > deltaMin) { // if t != 0, check if there is still a bigger difference,
+			l += t; // if so, add to l, divide t by 2, then look again.
+		} // if not, divide t by and look again.
+	}
+	int endId = id + l * dir;
+
+	lower = min(id, endId);
+	upper = max(id, endId);
+}
+
+int findSplit(int first, int last) {
+	int commonPrefix = delta(first, last);
+
+	// binary search to find where the next bit differs
+	int split = first;
+	int stride = last - first;
+	do {
+		stride = stride + 1 >> 1; // divide by 2 each time
+		int newSplit = split + stride; // possible new split location
+		if (newSplit < last) { // split within range
+			int splitPrefix = delta(first, newSplit);
+			if (splitPrefix > commonPrefix) {
+				split = newSplit; // set new split location
+			}
+		}
+	} while (stride > 1);
+	return split;
+}
+
+void main() {
+	uint globalWGInvoID = gl_GlobalInvocationID.x;
+	uint localWGInvoID = gl_LocalInvocationID.x;
+	const int primitiveCount = int(ubo.numTriangles + ubo.numSpheres);
+	const int LEAF_OFFSET = primitiveCount - 1;
+
+	// leaf nodes
+	if (globalWGInvoID < primitiveCount) {
+		AABB curr = aabbs[mortonPrimitives[globalWGInvoID].aabbIndex]; // requires that globalWGInvoID >= primitive count on workgroup invocation
+		// could modify with for loop like in radix sort to allow smaller workgroup
+		nodes[LEAF_OFFSET + globalWGInvoID] = HLBVHNode(curr, INVALID_HLBVHNODE_INDEX, INVALID_HLBVHNODE_INDEX, curr.index);
+	}
+
+	// internal nodes
+	if (globalWGInvoID < primitiveCount - 1) {
+		// figure out what range of objects the node corresponds to
+		int first; int last;
+		determineRange(int(globalWGInvoID), first, last);
+
+		// determine where to split the range
+		int split = findSplit(first, last);
+
+		// get left child
+		int leftChild = -1;
+		if (split == first) {
+			leftChild = LEAF_OFFSET + split; // index of leaf node
+		}
+		else {
+			leftChild = split; // index of internal node
+		}
+
+		// get right child
+		int rightChild = -1;
+		if (split + 1 == last) {
+			rightChild = LEAF_OFFSET + split + 1; 
+		}
+		else {
+			rightChild = split + 1;
+		}
+
+		// create internal node
+		AABB left = aabbs[mortonPrimitives[leftChild].aabbIndex];
+		AABB right = aabbs[mortonPrimitives[rightChild].aabbIndex];
+		nodes[globalWGInvoID] = HLBVHNode(
+			combineAABB(left, right),
+			leftChild,
+			rightChild,
+			0 // these are all non-leaf nodes, ie, they don't have a primitive and only connect to other hlbvh nodes
+		);
+	}
+}

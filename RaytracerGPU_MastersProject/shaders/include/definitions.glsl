@@ -63,6 +63,15 @@ struct MortonPrimitive {
 	uint aabbIndex;
 };
 
+#define INVALID_HLBVHNODE_INDEX 0
+
+struct HLBVHNode {
+	AABB aabb;
+	uint leftIndex;
+	uint rightIndex;
+	uint primitiveAABBIndex;
+};
+
 #define LIGHT_MATERIAL 0
 #define DIFFUSE_MATERIAL 1
 #define METALLIC_MATERIAL 2

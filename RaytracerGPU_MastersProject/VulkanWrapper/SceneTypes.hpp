@@ -116,6 +116,12 @@ namespace SceneTypes {
 			u32 code;
 			u32 aabbIndex;
 		};
+		struct BVHNode {
+			AABB aabb;
+			u32 left;
+			u32 right;
+			u32 aabbIndex;
+		};
 	};
 
 	using Material = SceneTypes::GPU::Material;
