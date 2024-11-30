@@ -2,7 +2,6 @@
 
 // adapted from https://github.com/MircoWerner/VkRadixSort 's SingleRadixSort
 
-#extension GL_GOOGLE_include_directive: enable
 #extension GL_KHR_shader_subgroup_basic: enable
 #extension GL_KHR_shader_subgroup_arithmetic: enable
 

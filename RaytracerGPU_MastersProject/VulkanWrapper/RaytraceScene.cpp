@@ -58,9 +58,9 @@ auto RaytraceScene::getGameObject(GameObjectId id) -> GameObject& {
 	}
 }
 
-auto RaytraceScene::getGameObject(size_t index) -> GameObject& {
-	return this->gameObjects.at(index);
-}
+//auto RaytraceScene::getGameObject(size_t index) -> GameObject& {
+//	return this->gameObjects.at(index);
+//}
 
 auto RaytraceScene::removeGameObject(GameObjectId id) -> bool {
 	return false; // TODO
@@ -142,21 +142,6 @@ auto RaytraceScene::getSphereCount() -> u32 {
 
 auto RaytraceScene::getMaterialCount() -> u32 {
 	return this->materialCount;
-}
-
-auto RaytraceScene::findEnclosingAABB(const std::vector<SceneTypes::GPU::AABB>& aabbs) -> std::pair<glm::vec3, glm::vec3> {
-	std::pair<glm::vec3, glm::vec3> out = { glm::vec3(std::numeric_limits<f32>::max()), glm::vec3(std::numeric_limits<f32>::lowest()) };
-	
-	for (auto i = 0; i < aabbs.size(); i++) {
-		out.first.x = Util::min<f32>(out.first.x, aabbs[i].center.x);
-		out.second.x = Util::max<f32>(out.second.x, aabbs[i].center.x);
-		out.first.y = Util::min<f32>(out.first.y, aabbs[i].center.y);
-		out.second.y = Util::max<f32>(out.second.y, aabbs[i].center.y);
-		out.first.z = Util::min<f32>(out.first.z, aabbs[i].center.z);
-		out.second.z = Util::max<f32>(out.second.z, aabbs[i].center.z);
-	}
-
-	return out;
 }
 
 auto RaytraceScene::createBuffers() -> void {

@@ -11,7 +11,7 @@ namespace Config {
 
 	constexpr const Programs CurrentProgram = Programs::RaytracerBVH;
 
-	constexpr const bool ShowBufferDebug = 1;
+	constexpr const bool ShowBufferDebug = 0;
 	constexpr const bool Fake1SecondDelay = 0;
 
 	constexpr const bool RunRayPerPixelIncreasingDemo = 0;

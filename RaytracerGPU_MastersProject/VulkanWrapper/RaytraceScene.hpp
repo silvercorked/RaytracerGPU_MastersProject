@@ -81,7 +81,7 @@ public:
 	auto addGameObject(GameObject&& gameObject) -> void;
 
 	auto getGameObject(GameObjectId id) -> GameObject&;
-	auto getGameObject(size_t index) -> GameObject&;
+	//auto getGameObject(size_t index) -> GameObject&;
 
 	auto removeGameObject(GameObjectId id) -> bool;
 	auto removeGameObject(size_t index) -> bool;
@@ -100,8 +100,6 @@ public:
 	auto getSphereCount() -> u32;
 	auto getMaterialCount() -> u32;
 	//auto getLightCount() -> u32;
-
-	auto findEnclosingAABB(const std::vector<SceneTypes::GPU::AABB>&) -> std::pair<glm::vec3, glm::vec3>;
 
 private:
 	auto createBuffers() -> void;

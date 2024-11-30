@@ -40,7 +40,7 @@ namespace RaytracerBVHRenderer {
 		u32 maxRayTraceDepth;
 		u32 randomState;
 	};
-	struct EnclosingAABBUniformBufferObject {
+	struct EnclosingAABBBufferObject {
 		alignas(16) glm::vec3 min;
 		alignas(16) glm::vec3 max;
 	};
@@ -58,68 +58,73 @@ namespace RaytracerBVHRenderer {
 
 		// createComputeDescriptorSetLayout
 		std::unique_ptr<DescriptorSetLayout> modelToWorldDescriptorSetLayout;
-		std::unique_ptr<DescriptorSetLayout> constructAABBDescriptorSetLayout;
+		std::unique_ptr<DescriptorSetLayout> enclosingAABBDescriptorSetLayout;
 		std::unique_ptr<DescriptorSetLayout> generateMortonCodeDescriptorSetLayout;
 		std::unique_ptr<DescriptorSetLayout> radixSortDescriptorSetLayout;
 		std::unique_ptr<DescriptorSetLayout> constructHLBVHDescriptorSetLayout;
-		//std::unique_ptr<DescriptorSetLayout> raytraceDescriptorSetLayout;
-		//std::unique_ptr<DescriptorSetLayout> graphicsDescriptorSetLayout;
+		std::unique_ptr<DescriptorSetLayout> constructAABBDescriptorSetLayout;
+		std::unique_ptr<DescriptorSetLayout> raytraceDescriptorSetLayout;
+		std::unique_ptr<DescriptorSetLayout> graphicsDescriptorSetLayout;
 
 		// createComputePipeline
 		std::unique_ptr<ComputePipeline> modelToWorldPipeline;
-		std::unique_ptr<ComputePipeline> constructAABBPipeline;
+		std::unique_ptr<ComputePipeline> enclosingAABBPipeline;
 		std::unique_ptr<ComputePipeline> generateMortonCodePipeline;
 		std::unique_ptr<ComputePipeline> radixSortComputePipeline;
 		std::unique_ptr<ComputePipeline> constructHLBVHComputePipeline;
-		//std::unique_ptr<ComputePipeline> raytracePipeline;
+		std::unique_ptr<ComputePipeline> constructAABBPipeline;
+		std::unique_ptr<ComputePipeline> raytracePipeline;
 		VkPipelineLayout modelToWorldPipelineLayout;
-		VkPipelineLayout constructAABBPipelineLayout;
+		VkPipelineLayout enclosingAABBPipelineLayout;
 		VkPipelineLayout generateMortonCodePipelineLayout;
 		VkPipelineLayout radixSortPipelineLayout;
 		VkPipelineLayout constructHLBVHPipelineLayout;
-		//VkPipelineLayout raytracePipelineLayout;
+		VkPipelineLayout constructAABBPipelineLayout;
+		VkPipelineLayout raytracePipelineLayout;
 
 		// createComputeImage
-		//VkImage computeImage;
-		//VkImageView computeImageView;
-		//VkDeviceMemory computeImageMemory;
-		//VkSampler fragmentShaderImageSampler;
+		VkImage computeImage;
+		VkImageView computeImageView;
+		VkDeviceMemory computeImageMemory;
+		VkSampler fragmentShaderImageSampler;
 
 		// createGraphicsPipeline
-		//std::unique_ptr<GraphicsPipeline> graphicsPipeline;
-		//VkPipelineLayout graphicsPipelineLayout;
+		std::unique_ptr<GraphicsPipeline> graphicsPipeline;
+		VkPipelineLayout graphicsPipelineLayout;
 
 		// createShaderStorageBuffers
 		std::unique_ptr<RaytraceScene> scene;
-		std::unique_ptr<Buffer> scratchBuffer;
-		// temp buffers for debugging
-		std::unique_ptr<Buffer> AABBBuffer;
+		std::unique_ptr<Buffer> enclosingAABBBuffer;
 		std::unique_ptr<Buffer> mortonPrimitiveBuffer1;
 		std::unique_ptr<Buffer> mortonPrimitiveBuffer2;
 		std::unique_ptr<Buffer> HLBVHNodesBuffer;
+		std::unique_ptr<Buffer> HLBVHConstructionInfoBuffer;
+		// temp buffers for debugging
+		std::unique_ptr<Buffer> scratchBuffer;
 
 		// createUniformBuffers
 		std::unique_ptr<Buffer> rayUniformBuffer;
-		std::unique_ptr<Buffer> enclosingAABBUniformBuffer;
-		//std::unique_ptr<Buffer> fragUniformBuffer;
+		std::unique_ptr<Buffer> fragUniformBuffer;
 
 		// createDesciptorPool
 		std::unique_ptr<DescriptorPool> modelToWorldDescriptorPool;
-		std::unique_ptr<DescriptorPool> constructAABBDescriptorPool;
+		std::unique_ptr<DescriptorPool> enclosingAABBDescriptorPool;
 		std::unique_ptr<DescriptorPool> generateMortonCodeDescriptorPool;
 		std::unique_ptr<DescriptorPool> radixSortDescriptorPool;
 		std::unique_ptr<DescriptorPool> constructHLBVHDescriptorPool;
-		//std::unique_ptr<DescriptorPool> raytraceDescriptorPool;
-		//std::unique_ptr<DescriptorPool> graphicsDescriptorPool;
+		std::unique_ptr<DescriptorPool> constructAABBDescriptorPool;
+		std::unique_ptr<DescriptorPool> raytraceDescriptorPool;
+		std::unique_ptr<DescriptorPool> graphicsDescriptorPool;
 
 		// createComputeDescriptorSets
 		std::vector<VkDescriptorSet> modelToWorldDescriptorSets;
-		std::vector<VkDescriptorSet> constructAABBDescriptorSets;
+		std::vector<VkDescriptorSet> enclosingAABBDescriptorSets;
 		std::vector<VkDescriptorSet> generateMortonCodeDescriptorSets;
 		std::vector<VkDescriptorSet> radixSortDescriptorSets;
 		std::vector<VkDescriptorSet> constructHLBVHDescriptorSets;
-		//std::vector<VkDescriptorSet> raytraceDescriptorSets;
-		//std::vector<VkDescriptorSet> graphicsDescriptorSets;
+		std::vector<VkDescriptorSet> constructAABBDescriptorSets;
+		std::vector<VkDescriptorSet> raytraceDescriptorSets;
+		std::vector<VkDescriptorSet> graphicsDescriptorSets;
 
 		// createComputeCommandBuffers
 		std::vector<VkCommandBuffer> computeS1CommandBuffers;
@@ -254,8 +259,8 @@ namespace RaytracerBVHRenderer {
 			}
 
 			// fences are for syncing cpu and gpu. semaphores are for specifying the order of gpu tasks
-			u32 imageIndex = 0; //this->getNextImageIndex(); // await graphics completion
-			u32 frameIndex = 0; //imageIndex% SwapChain::MAX_FRAMES_IN_FLIGHT;
+			u32 imageIndex = this->getNextImageIndex(); // await graphics completion
+			u32 frameIndex = imageIndex % SwapChain::MAX_FRAMES_IN_FLIGHT;
 			// number of frames currently rendering and number of images in swap chain are not the same
 
 			this->scene->updateScene();
@@ -316,7 +321,7 @@ namespace RaytracerBVHRenderer {
 			// frameIndex = index of frame in flight (ie, set of buffers to use to direct gpu)
 			this->recordComputeS1CommandBuffer(this->computeS1CommandBuffers[frameIndex], imageIndex);
 			this->recordComputeS2CommandBuffer(this->computeS2CommandBuffers[frameIndex], imageIndex);
-			//this->recordGraphicsCommandBuffer(this->graphicsCommandBuffer, imageIndex);
+			this->recordGraphicsCommandBuffer(this->graphicsCommandBuffer, imageIndex);
 
 			RaytracerBVHRenderer::RaytracingUniformBufferObject rUbo{};
 			rUbo.camPos = glm::vec3(275.0f, 275.0f, -800.0f);
@@ -332,12 +337,10 @@ namespace RaytracerBVHRenderer {
 			this->rayUniformBuffer->writeToBuffer(&rUbo);
 			this->rayUniformBuffer->flush(); // make visible to device
 
-			/*
 			RaytracerBVHRenderer::FragmentUniformBufferObject fUbo{};
 			fUbo.raysPerPixel = this->scene->getRaysPerPixel();
 			this->fragUniformBuffer->writeToBuffer(&fUbo);
 			this->fragUniformBuffer->flush();
-			*/
 
 			if constexpr (Config::ShowBufferDebug) {
 				auto resultFromGPU = this->DEBUGgetDeployedBufferAs<RaytracerBVHRenderer::RaytracingUniformBufferObject>(
@@ -382,14 +385,54 @@ namespace RaytracerBVHRenderer {
 			if (waitForComputeResult1 != VK_SUCCESS)
 				throw std::runtime_error("failed to submit draw command buffer!");
 			
-			auto AABBs = this->DEBUGgetDeployedBufferAs<SceneTypes::GPU::AABB>(
-				this->AABBBuffer->getBuffer(),
-				this->scene->getTriangleCount() + this->scene->getSphereCount()
-			);
+			if constexpr (Config::ShowBufferDebug) {
+				auto mortonPrimitives = this->DEBUGgetDeployedBufferAs<SceneTypes::GPU::MortonPrimitive>(
+					this->mortonPrimitiveBuffer1->getBuffer(),
+					this->scene->getTriangleCount() + this->scene->getSphereCount()
+				);
+				auto enclosingAABB = this->DEBUGgetDeployedBufferAs<EnclosingAABBBufferObject>(
+					this->enclosingAABBBuffer->getBuffer(),
+					1
+				);
+				std::cout << std::format("Enclosing AABB: min({}, {}, {}), max({}, {}, {})",
+					enclosingAABB[0].min.x, enclosingAABB[0].min.y, enclosingAABB[0].min.z,
+					enclosingAABB[0].max.x, enclosingAABB[0].max.y, enclosingAABB[0].max.z
+				);
+				std::cout << "morton Primitives:\n";
+				for (auto i = 0; i < mortonPrimitives.size(); i++) {
+					std::cout << std::format(
+						"i: {}, primIndex: {}, primType: {}, mortPrim: 0b{:032b}\n",
+						i, mortonPrimitives[i].primitiveIndex,
+						(mortonPrimitives[i].primitiveType == 0 ? "Sphere" : "Triangle"), mortonPrimitives[i].code
+					);
+				}
+
+				auto bvhNodes = this->DEBUGgetDeployedBufferAs<SceneTypes::GPU::BVHNode>(
+					this->HLBVHNodesBuffer->getBuffer(),
+					this->scene->getTriangleCount() + this->scene->getSphereCount() + this->scene->getTriangleCount() + this->scene->getSphereCount() - 1
+				);
+
+				for (auto i = 0; i < bvhNodes.size(); i++) {
+					SceneTypes::GPU::BVHNode node = bvhNodes[i];
+					std::cout << std::format(
+						"i: {}, left: {}, right: {},\n\tnode_aabbMin({}, {}, {}), node_aabbMax({}, {}, {})\n",
+						i, node.left, node.right,
+						node.aabb.minX, node.aabb.minY, node.aabb.minZ, node.aabb.maxX, node.aabb.maxY, node.aabb.maxZ
+					);
+					if (node.left == 0 && node.right == 0) {
+						std::cout << std::format(
+							"\tLEAF NODE prim_id: {}, prim_type: {}\n",
+							node.primitiveIndex, (node.primitiveType == 0 ? "Sphere" : "Triangle")
+						);
+					}
+				}
+			}
+			/*
 			auto [minVec3, maxVec3] = this->scene->findEnclosingAABB(AABBs);
 			RaytracerBVHRenderer::EnclosingAABBUniformBufferObject enclosing = {minVec3, maxVec3};
 			this->enclosingAABBUniformBuffer->writeToBuffer(&enclosing);
 			this->enclosingAABBUniformBuffer->flush();
+			*/
 
 			VkSubmitInfo submitInfoS2 = {};
 			submitInfoS2.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -405,49 +448,10 @@ namespace RaytracerBVHRenderer {
 			auto waitForComputeResult2 = vkWaitForFences(this->device.device(), 1, &this->computeS2Complete, VK_TRUE, UINT64_MAX);
 			if (waitForComputeResult2 != VK_SUCCESS)
 				throw std::runtime_error("failed to submit draw command buffer!");
-			
-			if constexpr (Config::ShowBufferDebug) {
-				auto mortonPrimitives = this->DEBUGgetDeployedBufferAs<SceneTypes::GPU::MortonPrimitive>(
-					this->mortonPrimitiveBuffer1->getBuffer(),
-					this->scene->getTriangleCount() + this->scene->getSphereCount()
-				);
-				std::cout << std::format("Enclosing AABB: min({}, {}, {}), max({}, {}, {})",
-					minVec3.x, minVec3.y, minVec3.z,
-					maxVec3.x, maxVec3.y, maxVec3.z
-				);
-				std::cout << "morton Primitives:\n";
-				for (auto i = 0; i < mortonPrimitives.size(); i++) {
-					SceneTypes::GPU::AABB aabb = AABBs[mortonPrimitives[i].aabbIndex];
-					std::cout << std::format(
-						"i: {}, aabbCenter({}, {}, {})\n\taabbMin({}, {}, {}), aabbMax({}, {}, {})\n\taabbIndex: {}, mortPrim: 0b{:032b}\n",
-						i, aabb.center.x, aabb.center.y, aabb.center.z, aabb.minX, aabb.minY, aabb.minZ, aabb.maxX, aabb.maxY, aabb.maxZ,
-						mortonPrimitives[i].aabbIndex, mortonPrimitives[i].code
-					);
-				}
-
-				auto bvhNodes = this->DEBUGgetDeployedBufferAs<SceneTypes::GPU::BVHNode>(
-					this->HLBVHNodesBuffer->getBuffer(),
-					this->scene->getTriangleCount() + this->scene->getSphereCount() + this->scene->getTriangleCount() + this->scene->getSphereCount() - 1
-				);
-
-				for (auto i = 0; i < bvhNodes.size(); i++) {
-					SceneTypes::GPU::BVHNode node = bvhNodes[i];
-					std::cout << std::format(
-						"i: {}, left: {}, right: {}, aabbIndex: {},\n\tnode_aabbMin({}, {}, {}), node_aabbMax({}, {}, {})\n",
-						i, node.left, node.right, node.aabbIndex, node.aabb.minX, node.aabb.minY, node.aabb.minZ, node.aabb.maxX, node.aabb.maxY, node.aabb.maxZ
-					);
-					if (node.left == 0 && node.right == 0) {
-						std::cout << std::format(
-							"\tLEAF NODE prim_id: {}, prim_type: {}\n",
-							AABBs[node.aabbIndex].index, (AABBs[node.aabbIndex].primitiveType == 0 ? "Sphere" : "Triangle")
-						);
-					}
-				}
-			}
 
 			vkResetFences(this->device.device(), 1, &this->computeS2Complete);
 
-			//this->swapChain->submitCommandBuffers(&this->graphicsCommandBuffer, &imageIndex);
+			this->swapChain->submitCommandBuffers(&this->graphicsCommandBuffer, &imageIndex);
 		}
 
 		auto recordComputeS1CommandBuffer(VkCommandBuffer, u32) -> void;

@@ -2,7 +2,7 @@
 #include "Config.hpp"
 
 #include "LogisticMap.hpp"
-//#include "Raytracer.hpp"
+#include "Raytracer.hpp"
 #include "RaytracerBVH.hpp"
 
 int main() {
@@ -10,10 +10,10 @@ int main() {
 		LogisticMapRenderer::LogisticMap comp{};
 		comp.mainLoop();
 	}
-	//else if constexpr (Config::CurrentProgram == Config::Programs::Raytracer) {
-	//	RaytracerRenderer::Raytracer comp{};
-	//	comp.mainLoop();
-	//}
+	else if constexpr (Config::CurrentProgram == Config::Programs::Raytracer) {
+		RaytracerRenderer::Raytracer comp{};
+		comp.mainLoop();
+	}
 	else if constexpr (Config::CurrentProgram == Config::Programs::RaytracerBVH) {
 		RaytracerBVHRenderer::Raytracer comp{};
 		comp.mainLoop();

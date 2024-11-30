@@ -33,24 +33,23 @@ layout(std430, binding = 4) readonly buffer MaterialBufferObject {
 	Material materials[ ];
 };
 
-layout(std430, binding = 5) buffer AABBBufferObject {
-	AABB aabbs[ ];
-};
-
-layout(std430, binding = 6) readonly buffer HLBVHBufferObject {
+layout(std430, binding = 5) readonly buffer HLBVHBufferObject {
 	HLBVHNode nodes[ ];
 };
 
-layout(std430, binding = 7) buffer scratchBufferObject {
+layout(std430, binding = 6) buffer scratchBufferObject {
 	float scratch[ ];
 };
+
+#define testX 175
+#define testY 650
 
 #define MAX_STACK_DEPTH 128
 
 // constants
 const float _FOCAL_DISTANCE = 10.0f;
 const float _DEFOCUS_ANGLE = 0.0f;
-const vec3 _BACKGROUND_COLOR = vec3(0);
+const vec3 _BACKGROUND_COLOR = vec3(0.0);
 
 vec2 _imageDimensions = vec2(imageSize(outputImage));
 float _aspectRatio = float(_imageDimensions.x) / float(_imageDimensions.y);
@@ -99,9 +98,16 @@ vec3 emitted(in HitRecord rec, inout vec3 point) {
 	return vec3(0);
 }
 bool scatter(in Ray rIn, in HitRecord rec, out vec3 attenuation, out Ray scattered) {
+	//if (gl_GlobalInvocationID.x == testX && gl_GlobalInvocationID.y == testY) {
+	//	scratch[17] = 17;
+	//}
 	if (materials[rec.materialIndex].materialType == DIFFUSE_MATERIAL) {
 		attenuation = materials[rec.materialIndex].albedo.xyz; // can upgrade to texture later
 		scattered = Ray(rec.p, normalize(rec.normal + randomUnitVector()));
+		//if (gl_GlobalInvocationID.x == testX && gl_GlobalInvocationID.y == testY) {
+		//	scratch[18] = 18;
+		//	scratch[19] = attenuation.x;
+		//}
 		return true;
 	}
 	return false;
@@ -194,23 +200,36 @@ bool hitBVH(in Ray r, in float tMin, in float tMax, out HitRecord rec) {
 	uint toVisitOffset = 0;
 	uint currentNodeIndex = 0;
 
+	//if (gl_GlobalInvocationID.x == testX && gl_GlobalInvocationID.y == testY) {
+	//	scratch[6] = 1;
+	//}
+
 	while (true) {
 		HLBVHNode node = nodes[currentNodeIndex];
 		if (
 			AABBhitCheck(r, vec3(node.aabb.minX, node.aabb.minY, node.aabb.minZ), vec3(node.aabb.maxX, node.aabb.maxY, node.aabb.maxZ))
 		) { // AABB hit case
+			//scratch[9] = 9;
 			if (node.leftIndex == INVALID_HLBVHNODE_INDEX && node.rightIndex == INVALID_HLBVHNODE_INDEX) { // leaf node case
-				AABB prim = aabbs[node.primitiveAABBIndex];
-				if (prim.primitiveType == SPHERE_PRIMITIVE) {
-					if (sphereHit(prim.index, r, tMin, closestSoFar, rec)) {
+				//if (gl_GlobalInvocationID.x == testX && gl_GlobalInvocationID.y == testY) {
+				//	scratch[10] = 10;
+				//}
+				if (node.primitiveType == SPHERE_PRIMITIVE) {
+					if (sphereHit(node.primitiveIndex, r, tMin, closestSoFar, rec)) {
 						hit = true;
 						closestSoFar = rec.t;
 					}
 				}
-				else if (prim.primitiveType == TRIANGLE_PRIMITIVE) {
-					if (triangleHit(prim.index, r, tMin, closestSoFar, rec)) {
+				else if (node.primitiveType == TRIANGLE_PRIMITIVE) {
+					//if (gl_GlobalInvocationID.x == testX && gl_GlobalInvocationID.y == testY) {
+					//	scratch[11] = 11;
+					//}
+					if (triangleHit(node.primitiveIndex, r, tMin, closestSoFar, rec)) {
 						hit = true;
 						closestSoFar = rec.t;
+						//if (gl_GlobalInvocationID.x == testX && gl_GlobalInvocationID.y == testY) {
+						//	scratch[12] = 12;
+						//}
 					}
 				}
 
@@ -225,10 +244,21 @@ bool hitBVH(in Ray r, in float tMin, in float tMax, out HitRecord rec) {
 			}
 		}
 		else { // AABB miss case
+			//if (gl_GlobalInvocationID.x == testX && gl_GlobalInvocationID.y == testY) {
+			//	scratch[8] = 8;
+			//}
 			if (toVisitOffset == 0) {
 				break;
 			}
 			currentNodeIndex = stack[--toVisitOffset];
+		}
+	}
+	if (gl_GlobalInvocationID.x == testX && gl_GlobalInvocationID.y == testY) {
+		if (hit) {
+			scratch[7] = 2;
+		}
+		else {
+			scratch[7] = 1;
 		}
 	}
 	return hit;
@@ -237,11 +267,13 @@ bool hitBVH(in Ray r, in float tMin, in float tMax, out HitRecord rec) {
 bool sceneHit(in Ray r, out HitRecord rec) {
 	float tMin = 0.001;
 	float tMax = 10000000;
+
+	bool hit = hitBVH(r, tMin, tMax, rec);
 	
-	return hitBVH(r, tMin, tMax, rec);
+	return hit;
 }
 
-vec3 rayColor(inout Ray r) {
+vec3 rayColor(in Ray r) {
 	HitRecord rec;
 	vec3 color = vec3(0);
 	vec3 globalAttenuation = vec3(1);
@@ -253,15 +285,31 @@ vec3 rayColor(inout Ray r) {
 			break;
 		}
 		else {
+			if (gl_GlobalInvocationID.x == testX && gl_GlobalInvocationID.y == testY) {
+				scratch[13] = 13;
+			}
 			vec3 attenuation;
 			vec3 emittedColor = emitted(rec, rec.p);
 			color += emittedColor * globalAttenuation;
 			bool scattered = scatter(curr, rec, attenuation, curr);
 			globalAttenuation *= attenuation;
+			if (gl_GlobalInvocationID.x == testX && gl_GlobalInvocationID.y == testY) {
+				scratch[0] = emittedColor.x;
+				scratch[1] = emittedColor.y;
+				scratch[2] = emittedColor.z;
+				scratch[3] = attenuation.x;
+				scratch[4] = attenuation.y;
+				scratch[5] = attenuation.z;
+			}
 			
 			if (!scattered)
 				break;
 		}
+	}
+	if (gl_GlobalInvocationID.x == testX && gl_GlobalInvocationID.y == testY) {
+		scratch[14] = color.x;
+		scratch[15] = color.y;
+		scratch[16] = color.z;
 	}
 	return color;
 }
@@ -306,6 +354,20 @@ void main() {
 	Ray r = getRay(gl_GlobalInvocationID.xy);
 
 	vec3 pixelColor = rayColor(r);
+
+	/*if (gl_GlobalInvocationID.x == testX && gl_GlobalInvocationID.y == testY) {
+		scratch[0] = pixelColor.x;
+		scratch[1] = pixelColor.y;
+		scratch[2] = pixelColor.z;
+
+		HitRecord rec;
+		rec.t = 0;
+		rec.materialIndex = 100;
+		bool hit = hitBVH(r, 0.000001, 274, rec);
+		scratch[3] = hit ? 1 : 0;
+		scratch[4] = rec.t;
+		scratch[5] = rec.materialIndex;
+	}*/
 
 	vec4 newColor = vec4(pixelColor + currentColor.xyz, nextRandom);
 	

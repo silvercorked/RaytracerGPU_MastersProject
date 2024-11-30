@@ -17,16 +17,22 @@ layout(binding = 0) uniform ParameterUBO {
 	uint randomState;
 } ubo;
 
-layout(binding = 1) uniform EnclosingAABBUBO {
+layout(binding = 1) buffer EnclosingAABBSSBO {
 	vec4 eMin;
 	vec4 eMax;
 } enclosingAABB;
 
-layout(std430, binding = 2) buffer AABBBufferObject {
-	AABB aabbs[ ];
+layout(std430, binding = 2) buffer TriangleBufferObject {
+	Triangle triangles[ ];
 };
-layout(std430, binding = 3) buffer MortonPrimitivesBufferObject {
+layout(std430, binding = 3) buffer SpheresBufferObject {
+	Sphere spheres[ ];
+};
+layout(std430, binding = 4) buffer MortonPrimitivesBufferObject {
 	MortonPrimitive mortonPrimitives[ ];
+};
+layout(std430, binding = 5) buffer scratchBufferObject {
+	float scratch[ ];
 };
 
 const uint MORTON_BITS = 10;
@@ -58,17 +64,30 @@ uvec3 quantizeForMorton(in vec3 coord) {
 	return uvec3(offset * MORTON_SCALE); // rescale to morton and cut off decimals
 }
 
+vec3 getTriangleCenter(Triangle t) { // just getting the centroid.
+	return ((t.v0 + t.v1 + t.v2) / 3).xyz;
+}
+
 // vkCmdDispatch(commandBuffer, ((numTriangles + numSpheres) / 32) + 1, 1, 1);
 void main() {
 	uint i = gl_GlobalInvocationID.x;
 	if (i < ubo.numTriangles + ubo.numSpheres) {
 		MortonPrimitive mp;
-		AABB box = aabbs[i];
+		vec3 center;
+		if (i < ubo.numTriangles) {
+			center = getTriangleCenter(triangles[i]);
+			mp.primitiveType = TRIANGLE_PRIMITIVE;
+		}
+		else {
+			i = i - ubo.numTriangles;
+			center = spheres[i].center.xyz;
+			mp.primitiveType = SPHERE_PRIMITIVE;
+		}
 
-		uvec3 quantizedCoord = quantizeForMorton(box.center.xyz);
+		uvec3 quantizedCoord = quantizeForMorton(center);
 		
 		mp.code = mortonCode3D(quantizedCoord);
-		mp.aabbIndex = i;
+		mp.primitiveIndex = i;
 		
 		mortonPrimitives[i] = mp;
 	}

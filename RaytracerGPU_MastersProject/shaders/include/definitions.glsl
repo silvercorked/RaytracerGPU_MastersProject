@@ -50,17 +50,15 @@ struct HitRecord {
 };
 
 struct AABB {
-	vec4 center;
 	float minX; float maxX;
 	float minY; float maxY;
 	float minZ; float maxZ;
-	uint index;
-	uint primitiveType;
 };
 
 struct MortonPrimitive {
 	uint code;
-	uint aabbIndex;
+	uint primitiveIndex;
+	uint primitiveType;
 };
 
 #define INVALID_HLBVHNODE_INDEX 0
@@ -69,7 +67,13 @@ struct HLBVHNode {
 	AABB aabb;
 	uint leftIndex;
 	uint rightIndex;
-	uint primitiveAABBIndex;
+	uint primitiveIndex;
+	uint primitiveType;
+};
+
+struct HLBVHAABBConstructionInfo {
+	uint parent;
+	int visitationCount;
 };
 
 #define LIGHT_MATERIAL 0

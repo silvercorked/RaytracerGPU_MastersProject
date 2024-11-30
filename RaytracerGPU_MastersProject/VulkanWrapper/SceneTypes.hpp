@@ -105,22 +105,21 @@ namespace SceneTypes {
 			}
 		};
 		struct AABB {
-			alignas(16) glm::vec3 center;
-			alignas(16) f32 minX; f32 maxX;
+			f32 minX; f32 maxX;
 			f32 minY; f32 maxY;
 			f32 minZ; f32 maxZ;
-			u32 index;
-			u32 primitiveType; // 0 -> sphere, 1 -> triangle
 		};
 		struct MortonPrimitive {
 			u32 code;
-			u32 aabbIndex;
+			u32 primitiveIndex;
+			u32 primitiveType;
 		};
 		struct BVHNode {
 			AABB aabb;
 			u32 left;
 			u32 right;
-			u32 aabbIndex;
+			u32 primitiveIndex;
+			u32 primitiveType;
 		};
 	};
 

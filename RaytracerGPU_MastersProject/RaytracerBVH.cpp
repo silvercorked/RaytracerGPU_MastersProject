@@ -12,28 +12,29 @@ namespace RaytracerBVHRenderer {
 	Raytracer::~Raytracer() {
 		this->modelToWorldPipeline = nullptr;
 		vkDestroyPipelineLayout(this->device.device(), this->modelToWorldPipelineLayout, nullptr);
-		//this->raytracePipeline = nullptr;
-		//vkDestroyPipelineLayout(this->device.device(), this->raytracePipelineLayout, nullptr);
+		this->raytracePipeline = nullptr;
+		vkDestroyPipelineLayout(this->device.device(), this->raytracePipelineLayout, nullptr);
 
-		//this->graphicsPipeline = nullptr;
-		//vkDestroyPipelineLayout(this->device.device(), this->graphicsPipelineLayout, nullptr);
+		this->graphicsPipeline = nullptr;
+		vkDestroyPipelineLayout(this->device.device(), this->graphicsPipelineLayout, nullptr);
 
-		//vkDestroyImage(this->device.device(), this->computeImage, nullptr);
-		//vkDestroyImageView(this->device.device(), this->computeImageView, nullptr);
-		//vkDestroySampler(this->device.device(), this->fragmentShaderImageSampler, nullptr);
-		//vkFreeMemory(this->device.device(), this->computeImageMemory, nullptr);
+		vkDestroyImage(this->device.device(), this->computeImage, nullptr);
+		vkDestroyImageView(this->device.device(), this->computeImageView, nullptr);
+		vkDestroySampler(this->device.device(), this->fragmentShaderImageSampler, nullptr);
+		vkFreeMemory(this->device.device(), this->computeImageMemory, nullptr);
 
-		//vkDestroyFence(this->device.device(), this->computeComplete, nullptr);
+		vkDestroyFence(this->device.device(), this->computeS1Complete, nullptr);
+		vkDestroyFence(this->device.device(), this->computeS2Complete, nullptr);
 
 		this->rayUniformBuffer = nullptr; // deconstruct uniformBuffer
-		//this->fragUniformBuffer = nullptr;
+		this->fragUniformBuffer = nullptr;
 		// scene handles deconstructing ssbos // deconstruct ssbos
 		this->modelToWorldDescriptorSetLayout = nullptr;
-		//this->raytraceDescriptorSetLayout = nullptr; // deconstruct descriptorSetLayout
+		this->raytraceDescriptorSetLayout = nullptr; // deconstruct descriptorSetLayout
 
 		this->modelToWorldDescriptorPool = nullptr; // deconstruct descriptorPool
-		//this->raytraceDescriptorPool = nullptr;
-		//this->graphicsDescriptorPool = nullptr;
+		this->raytraceDescriptorPool = nullptr;
+		this->graphicsDescriptorPool = nullptr;
 	}
 
 	auto Raytracer::createSwapChain() -> void {
@@ -73,7 +74,7 @@ namespace RaytracerBVHRenderer {
 				VK_SHADER_STAGE_COMPUTE_BIT,
 				1
 			).build();
-		this->constructAABBDescriptorSetLayout = DescriptorSetLayout::Builder(this->device)
+		this->enclosingAABBDescriptorSetLayout = DescriptorSetLayout::Builder(this->device)
 			.addBinding(
 				0,
 				VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
@@ -91,6 +92,11 @@ namespace RaytracerBVHRenderer {
 				1
 			).addBinding(
 				3,
+				VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+				VK_SHADER_STAGE_COMPUTE_BIT,
+				1
+			).addBinding(
+				4,
 				VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
 				VK_SHADER_STAGE_COMPUTE_BIT,
 				1
@@ -103,7 +109,7 @@ namespace RaytracerBVHRenderer {
 				1
 			).addBinding(
 				1,
-				VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+				VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
 				VK_SHADER_STAGE_COMPUTE_BIT,
 				1
 			).addBinding(
@@ -113,6 +119,16 @@ namespace RaytracerBVHRenderer {
 				1
 			).addBinding(
 				3,
+				VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+				VK_SHADER_STAGE_COMPUTE_BIT,
+				1
+			).addBinding(
+				4,
+				VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+				VK_SHADER_STAGE_COMPUTE_BIT,
+				1
+			).addBinding(
+				5,
 				VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
 				VK_SHADER_STAGE_COMPUTE_BIT,
 				1
@@ -155,8 +171,34 @@ namespace RaytracerBVHRenderer {
 				VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
 				VK_SHADER_STAGE_COMPUTE_BIT,
 				1
+			).addBinding(
+				4,
+				VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+				VK_SHADER_STAGE_COMPUTE_BIT,
+				1
+			).addBinding(
+				5,
+				VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+				VK_SHADER_STAGE_COMPUTE_BIT,
+				1
 			).build();
-		/*
+		this->constructAABBDescriptorSetLayout = DescriptorSetLayout::Builder(this->device)
+			.addBinding(
+				0,
+				VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+				VK_SHADER_STAGE_COMPUTE_BIT,
+				1
+			).addBinding(
+				1,
+				VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+				VK_SHADER_STAGE_COMPUTE_BIT,
+				1
+			).addBinding(
+				2,
+				VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+				VK_SHADER_STAGE_COMPUTE_BIT,
+				1
+			).build();
 		this->raytraceDescriptorSetLayout = DescriptorSetLayout::Builder(this->device)
 			.addBinding(
 				0,
@@ -188,11 +230,14 @@ namespace RaytracerBVHRenderer {
 				VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
 				VK_SHADER_STAGE_COMPUTE_BIT,
 				1
+			).addBinding(
+				6,
+				VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+				VK_SHADER_STAGE_COMPUTE_BIT,
+				1
 			).build();
-		*/
 	}
 	auto Raytracer::createGraphicsDescriptorSetLayout() -> void {
-		/*
 		this->graphicsDescriptorSetLayout = DescriptorSetLayout::Builder(this->device)
 			.addBinding(
 				0,
@@ -206,7 +251,6 @@ namespace RaytracerBVHRenderer {
 				VK_SHADER_STAGE_FRAGMENT_BIT,
 				1
 			).build();
-		*/
 	}
 
 	auto Raytracer::createComputePipelineLayout() -> void {
@@ -219,13 +263,13 @@ namespace RaytracerBVHRenderer {
 		if (vkCreatePipelineLayout(this->device.device(), &pipelineLayoutInfo1, nullptr, &this->modelToWorldPipelineLayout) != VK_SUCCESS)
 			throw std::runtime_error("failed to create compute pipeline layout!");
 
-		VkDescriptorSetLayout tempAABB = this->constructAABBDescriptorSetLayout->getDescriptorSetLayout();
-		VkPipelineLayoutCreateInfo pipelineLayoutInfo2{};
-		pipelineLayoutInfo2.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		pipelineLayoutInfo2.setLayoutCount = 1;
-		pipelineLayoutInfo2.pSetLayouts = &tempAABB;
+		VkDescriptorSetLayout tempEnclosing = this->enclosingAABBDescriptorSetLayout->getDescriptorSetLayout();
+		VkPipelineLayoutCreateInfo pipelineLayoutInfo7{};
+		pipelineLayoutInfo7.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+		pipelineLayoutInfo7.setLayoutCount = 1;
+		pipelineLayoutInfo7.pSetLayouts = &tempEnclosing;
 
-		if (vkCreatePipelineLayout(this->device.device(), &pipelineLayoutInfo2, nullptr, &this->constructAABBPipelineLayout) != VK_SUCCESS)
+		if (vkCreatePipelineLayout(this->device.device(), &pipelineLayoutInfo7, nullptr, &this->enclosingAABBPipelineLayout) != VK_SUCCESS)
 			throw std::runtime_error("failed to create compute pipeline layout!");
 
 		VkDescriptorSetLayout tempMortonCode = this->generateMortonCodeDescriptorSetLayout->getDescriptorSetLayout();
@@ -255,16 +299,23 @@ namespace RaytracerBVHRenderer {
 		if (vkCreatePipelineLayout(this->device.device(), &pipelineLayoutInfo5, nullptr, &this->constructHLBVHPipelineLayout) != VK_SUCCESS)
 			throw std::runtime_error("failed to create compute pipeline layout!");
 
-		/*
-		VkDescriptorSetLayout tempRaytrace = this->raytraceDescriptorSetLayout->getDescriptorSetLayout();
+		VkDescriptorSetLayout tempAABB = this->constructAABBDescriptorSetLayout->getDescriptorSetLayout();
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo2{};
 		pipelineLayoutInfo2.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		pipelineLayoutInfo2.setLayoutCount = 1;
-		pipelineLayoutInfo2.pSetLayouts = &tempRaytrace;
+		pipelineLayoutInfo2.pSetLayouts = &tempAABB;
 
-		if (vkCreatePipelineLayout(this->device.device(), &pipelineLayoutInfo2, nullptr, &this->raytracePipelineLayout) != VK_SUCCESS)
+		if (vkCreatePipelineLayout(this->device.device(), &pipelineLayoutInfo2, nullptr, &this->constructAABBPipelineLayout) != VK_SUCCESS)
 			throw std::runtime_error("failed to create compute pipeline layout!");
-		*/
+
+		VkDescriptorSetLayout tempRaytrace = this->raytraceDescriptorSetLayout->getDescriptorSetLayout();
+		VkPipelineLayoutCreateInfo pipelineLayoutInfo6{};
+		pipelineLayoutInfo6.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+		pipelineLayoutInfo6.setLayoutCount = 1;
+		pipelineLayoutInfo6.pSetLayouts = &tempRaytrace;
+
+		if (vkCreatePipelineLayout(this->device.device(), &pipelineLayoutInfo6, nullptr, &this->raytracePipelineLayout) != VK_SUCCESS)
+			throw std::runtime_error("failed to create compute pipeline layout!");
 	}
 	auto Raytracer::createComputePipeline() -> void {
 		{
@@ -281,10 +332,10 @@ namespace RaytracerBVHRenderer {
 		{
 			ComputePipelineConfigInfo pipelineConfig{};
 			ComputePipeline::defaultPipelineConfigInfo(pipelineConfig);
-			pipelineConfig.pipelineLayout = this->constructAABBPipelineLayout;
-			this->constructAABBPipeline = std::make_unique<ComputePipeline>(
+			pipelineConfig.pipelineLayout = this->enclosingAABBPipelineLayout;
+			this->enclosingAABBPipeline = std::make_unique<ComputePipeline>(
 				this->device,
-				"shaders/compiled/ConstructAABBs.comp.spv",
+				"shaders/compiled/GetEnclosingAABB.comp.spv",
 				pipelineConfig
 			);
 		}
@@ -295,7 +346,7 @@ namespace RaytracerBVHRenderer {
 			pipelineConfig.pipelineLayout = this->generateMortonCodePipelineLayout;
 			this->generateMortonCodePipeline = std::make_unique<ComputePipeline>(
 				this->device,
-				"shaders/compiled/GenerateMortonCodesOfAABBs.comp.spv",
+				"shaders/compiled/GenerateMortonCodesOfPrimitives.comp.spv",
 				pipelineConfig
 			);
 		}
@@ -317,27 +368,35 @@ namespace RaytracerBVHRenderer {
 			pipelineConfig.pipelineLayout = this->constructHLBVHPipelineLayout;
 			this->constructHLBVHComputePipeline = std::make_unique<ComputePipeline>(
 				this->device,
-				"shaders/compiled/constructHLBVH.comp.spv",
+				"shaders/compiled/ConstructHLBVH.comp.spv",
 				pipelineConfig
 			);
 		}
 
-		/*
+		{
+			ComputePipelineConfigInfo pipelineConfig{};
+			ComputePipeline::defaultPipelineConfigInfo(pipelineConfig);
+			pipelineConfig.pipelineLayout = this->constructAABBPipelineLayout;
+			this->constructAABBPipeline = std::make_unique<ComputePipeline>(
+				this->device,
+				"shaders/compiled/ConstructAABBsOfInternalNodes.comp.spv",
+				pipelineConfig
+			);
+		}
+
 		{
 			ComputePipelineConfigInfo pipelineConfig{};
 			ComputePipeline::defaultPipelineConfigInfo(pipelineConfig);
 			pipelineConfig.pipelineLayout = this->raytracePipelineLayout;
 			this->raytracePipeline = std::make_unique<ComputePipeline>(
 				this->device,
-				"shaders/compiled/raytrace.comp.spv",
+				"shaders/compiled/raytraceBVH.comp.spv",
 				pipelineConfig
 			);
 		}
-		*/
 	}
 
 	auto Raytracer::createComputeImage() -> void {
-		/*
 		VkImageCreateInfo imageInfo{};
 		imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 		imageInfo.imageType = VK_IMAGE_TYPE_2D;
@@ -393,11 +452,9 @@ namespace RaytracerBVHRenderer {
 		if (vkCreateSampler(this->device.device(), &samplerInfo, nullptr, &this->fragmentShaderImageSampler) != VK_SUCCESS) {
 			std::runtime_error("failed to create image sampler");
 		}
-		*/
 	}
 
 	auto Raytracer::createGraphicsPipeline() -> void {
-		/*
 		VkDescriptorSetLayout tempGraphics = this->graphicsDescriptorSetLayout->getDescriptorSetLayout();
 		VkPipelineLayoutCreateInfo layoutCreateInfo{};
 		layoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -417,7 +474,6 @@ namespace RaytracerBVHRenderer {
 			"shaders/compiled/SingleTriangleFullScreen.frag.spv",
 			pipelineConfig
 		);
-		*/
 	}
 
 	auto Raytracer::createScene() -> void {
@@ -455,11 +511,11 @@ namespace RaytracerBVHRenderer {
 		cornellBoxScene(this->scene);
 
 		const u32 primCount = this->scene->getTriangleCount() + this->scene->getSphereCount();
-
-		this->AABBBuffer = std::make_unique<Buffer>(
+		
+		this->enclosingAABBBuffer = std::make_unique<Buffer>(
 			this->device,
-			sizeof(SceneTypes::GPU::AABB),
-			primCount,
+			sizeof(EnclosingAABBBufferObject),
+			1,
 			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT, // is ssbo and will transfer into
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
 		);
@@ -484,6 +540,13 @@ namespace RaytracerBVHRenderer {
 			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT, // is ssbo and will transfer into
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
 		);
+		this->HLBVHConstructionInfoBuffer = std::make_unique<Buffer>(
+			this->device,
+			sizeof(u32) * 2,
+			primCount + primCount - 1,
+			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT, // is ssbo and will transfer into
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+		);
 	}
 
 	auto Raytracer::createUniformBuffers() -> void {
@@ -496,18 +559,7 @@ namespace RaytracerBVHRenderer {
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
 		);
 		this->rayUniformBuffer->map();
-		
-		VkDeviceSize bufferSizeEnclosingAABB = sizeof(RaytracerBVHRenderer::EnclosingAABBUniformBufferObject);
-		this->enclosingAABBUniformBuffer = std::make_unique<Buffer>(
-			this->device,
-			bufferSizeEnclosingAABB,
-			1,
-			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT, //TODO remove transfer src. there only for debugging
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-		);
-		this->enclosingAABBUniformBuffer->map();
 
-		/*
 		VkDeviceSize bufferSizeFrag = sizeof(RaytracerBVHRenderer::FragmentUniformBufferObject);
 		this->fragUniformBuffer = std::make_unique<Buffer>(
 			this->device,
@@ -517,7 +569,6 @@ namespace RaytracerBVHRenderer {
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
 		);
 		this->fragUniformBuffer->map();
-		*/
 	}
 
 	auto Raytracer::createComputeDescriptorPool() -> void {
@@ -526,15 +577,15 @@ namespace RaytracerBVHRenderer {
 			.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1)
 			.addPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3)
 			.build();
-		this->constructAABBDescriptorPool = DescriptorPool::Builder(this->device)
+		this->enclosingAABBDescriptorPool = DescriptorPool::Builder(this->device)
 			.setMaxSets(1)
 			.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1)
-			.addPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3)
+			.addPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 4)
 			.build();
 		this->generateMortonCodeDescriptorPool = DescriptorPool::Builder(this->device)
 			.setMaxSets(1)
-			.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2)
-			.addPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2)
+			.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1)
+			.addPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 5)
 			.build();
 		this->radixSortDescriptorPool = DescriptorPool::Builder(this->device)
 			.setMaxSets(1)
@@ -544,16 +595,19 @@ namespace RaytracerBVHRenderer {
 		this->constructHLBVHDescriptorPool = DescriptorPool::Builder(this->device)
 			.setMaxSets(1)
 			.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1)
-			.addPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3)
+			.addPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 5)
 			.build();
-		/*
+		this->constructAABBDescriptorPool = DescriptorPool::Builder(this->device)
+			.setMaxSets(1)
+			.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1)
+			.addPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2)
+			.build();
 		this->raytraceDescriptorPool = DescriptorPool::Builder(this->device)
 			.setMaxSets(1)
 			.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1)
 			.addPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1)
-			.addPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 4)
+			.addPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 6)
 			.build();
-		*/
 	}
 
 	auto Raytracer::createComputeDescriptorSets() -> void {
@@ -562,25 +616,24 @@ namespace RaytracerBVHRenderer {
 		this->generateMortonCodeDescriptorSets.resize(1);
 		this->radixSortDescriptorSets.resize(1);
 		this->constructHLBVHDescriptorSets.resize(1);
-		//this->raytraceDescriptorSets.resize(1);
+		this->raytraceDescriptorSets.resize(1);
+		this->enclosingAABBDescriptorSets.resize(1);
 		auto uboBufferInfo = this->rayUniformBuffer->descriptorInfo();
-		auto uniformEnclosingAABBBufferInfo = this->enclosingAABBUniformBuffer->descriptorInfo();
+		auto ssboEnclosingAABBBufferInfo = this->enclosingAABBBuffer->descriptorInfo();
 		auto ssboModelBufferInfo = this->scene->getModelBuffer()->descriptorInfo();
 		auto ssboTriangleBufferInfo = this->scene->getTriangleBuffer()->descriptorInfo();
 		auto ssboSphereBufferInfo = this->scene->getSphereBuffer()->descriptorInfo();
 		auto ssboMaterialBufferInfo = this->scene->getMaterialBuffer()->descriptorInfo();
 		auto ssboScratchBufferInfo = this->scratchBuffer->descriptorInfo();
-		auto ssboAABBBufferInfo = this->AABBBuffer->descriptorInfo();
 		auto ssboMortonBufferInfo1 = this->mortonPrimitiveBuffer1->descriptorInfo();
 		auto ssboMortonBufferInfo2 = this->mortonPrimitiveBuffer2->descriptorInfo();
 		auto ssboBVHNodeInfo = this->HLBVHNodesBuffer->descriptorInfo();
+		auto ssboBVHConstructionInfoInfo = this->HLBVHConstructionInfoBuffer->descriptorInfo();
 
-		/*
 		VkDescriptorImageInfo descImageInfo{};
 		descImageInfo.sampler = nullptr;
 		descImageInfo.imageView = this->computeImageView;
 		descImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-		*/
 
 		DescriptorWriter(*this->modelToWorldDescriptorSetLayout, *this->modelToWorldDescriptorPool)
 			.writeBuffer(0, &uboBufferInfo)
@@ -588,21 +641,21 @@ namespace RaytracerBVHRenderer {
 			.writeBuffer(2, &ssboTriangleBufferInfo)
 			.writeBuffer(3, &ssboSphereBufferInfo)
 			.build(this->modelToWorldDescriptorSets[0]);
-
-		DescriptorWriter(*this->constructAABBDescriptorSetLayout, *this->constructAABBDescriptorPool)
+		DescriptorWriter(*this->enclosingAABBDescriptorSetLayout, *this->enclosingAABBDescriptorPool)
 			.writeBuffer(0, &uboBufferInfo)
-			.writeBuffer(1, &ssboTriangleBufferInfo)
-			.writeBuffer(2, &ssboSphereBufferInfo)
-			.writeBuffer(3, &ssboAABBBufferInfo)
-			.build(this->constructAABBDescriptorSets[0]);
-
+			.writeBuffer(1, &ssboEnclosingAABBBufferInfo)
+			.writeBuffer(2, &ssboTriangleBufferInfo)
+			.writeBuffer(3, &ssboSphereBufferInfo)
+			.writeBuffer(4, &ssboScratchBufferInfo)
+			.build(this->enclosingAABBDescriptorSets[0]);
 		DescriptorWriter(*this->generateMortonCodeDescriptorSetLayout, *this->generateMortonCodeDescriptorPool)
 			.writeBuffer(0, &uboBufferInfo)
-			.writeBuffer(1, &uniformEnclosingAABBBufferInfo)
-			.writeBuffer(2, &ssboAABBBufferInfo)
-			.writeBuffer(3, &ssboMortonBufferInfo1)
+			.writeBuffer(1, &ssboEnclosingAABBBufferInfo)
+			.writeBuffer(2, &ssboTriangleBufferInfo)
+			.writeBuffer(3, &ssboSphereBufferInfo)
+			.writeBuffer(4, &ssboMortonBufferInfo1)
+			.writeBuffer(5, &ssboScratchBufferInfo)
 			.build(this->generateMortonCodeDescriptorSets[0]);
-
 		DescriptorWriter(*this->radixSortDescriptorSetLayout, *this->radixSortDescriptorPool)
 			.writeBuffer(0, &uboBufferInfo)
 			.writeBuffer(1, &ssboMortonBufferInfo1)
@@ -610,32 +663,35 @@ namespace RaytracerBVHRenderer {
 			.build(this->radixSortDescriptorSets[0]);
 		DescriptorWriter(*this->constructHLBVHDescriptorSetLayout, *this->constructHLBVHDescriptorPool)
 			.writeBuffer(0, &uboBufferInfo)
-			.writeBuffer(1, &ssboAABBBufferInfo)
-			.writeBuffer(2, &ssboMortonBufferInfo1)
-			.writeBuffer(3, &ssboBVHNodeInfo)
+			.writeBuffer(1, &ssboTriangleBufferInfo)
+			.writeBuffer(2, &ssboSphereBufferInfo)
+			.writeBuffer(3, &ssboMortonBufferInfo1)
+			.writeBuffer(4, &ssboBVHNodeInfo)
+			.writeBuffer(5, &ssboBVHConstructionInfoInfo)
 			.build(this->constructHLBVHDescriptorSets[0]);
-		/*
+		DescriptorWriter(*this->constructAABBDescriptorSetLayout, *this->constructAABBDescriptorPool)
+			.writeBuffer(0, &uboBufferInfo)
+			.writeBuffer(1, &ssboBVHNodeInfo)
+			.writeBuffer(2, &ssboBVHConstructionInfoInfo)
+			.build(this->constructAABBDescriptorSets[0]);
 		DescriptorWriter(*this->raytraceDescriptorSetLayout, *this->raytraceDescriptorPool)
 			.writeBuffer(0, &uboBufferInfo)
 			.writeImage(1, &descImageInfo)
 			.writeBuffer(2, &ssboTriangleBufferInfo)
 			.writeBuffer(3, &ssboSphereBufferInfo)
 			.writeBuffer(4, &ssboMaterialBufferInfo)
-			.writeBuffer(5, &ssboScratchBufferInfo)
+			.writeBuffer(5, &ssboBVHNodeInfo)
+			.writeBuffer(6, &ssboScratchBufferInfo)
 			.build(this->raytraceDescriptorSets[0]);
-		*/
 	}
 	auto Raytracer::createGraphicsDescriptorPool() -> void {
-		/*
 		this->graphicsDescriptorPool = DescriptorPool::Builder(this->device)
 			.setMaxSets(1)
 			.addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1)
 			.addPoolSize(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1)
 			.build();
-		*/
 	}
 	auto Raytracer::createGraphicsDescriptorSets() -> void {
-		/*
 		this->graphicsDescriptorSets.resize(1);
 		auto uboBufferInfo = this->fragUniformBuffer->descriptorInfo();
 
@@ -648,7 +704,6 @@ namespace RaytracerBVHRenderer {
 			.writeBuffer(0, &uboBufferInfo)
 			.writeImage(1, &descImageInfo)
 			.build(this->graphicsDescriptorSets[0]);
-		*/
 	}
 
 	auto Raytracer::createComputeCommandBuffers() -> void {
@@ -677,21 +732,48 @@ namespace RaytracerBVHRenderer {
 			throw std::runtime_error("Failed to allocate compute Command Buffers!");
 	}
 	auto Raytracer::recordComputeS1CommandBuffer(VkCommandBuffer commandBuffer, u32 currImageIndex) -> void {
+		static bool firstRun = true;
 		VkCommandBufferBeginInfo beginInfo{};
 		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
-		/*
+		if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
+			throw std::runtime_error("failed to begin recording compute command buffer!");
+		}
+
 		VkImageSubresourceRange range{};
 		range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		range.levelCount = VK_REMAINING_MIP_LEVELS;
 		range.layerCount = VK_REMAINING_ARRAY_LAYERS;
 		range.baseArrayLayer = 0;
 		range.baseMipLevel = 0;
-		*/
 
-		if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
-			throw std::runtime_error("failed to begin recording compute command buffer!");
-		}
+		VkImageMemoryBarrier reset;
+		reset.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		reset.pNext = nullptr;
+		reset.srcAccessMask = 0;
+		reset.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
+		reset.oldLayout = firstRun ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		reset.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+		reset.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		reset.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		reset.image = this->computeImage;
+		reset.subresourceRange = range;
+
+		vkCmdPipelineBarrier(
+			commandBuffer,
+			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, // src stage
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, // dst stage
+			0, // no dependencies
+			0, nullptr, // no memory barriers
+			0, nullptr, // no buffer memory barriers
+			1, &reset // 1 imageMemoryBarrier
+		);
+
+		VkClearColorValue clearValue = { 0.0f, 0.0f, 0.0f, 1.0f };
+		vkCmdClearColorImage(
+			commandBuffer, this->computeImage,
+			VK_IMAGE_LAYOUT_GENERAL, &clearValue, 1, &range
+		);
 
 		this->modelToWorldPipeline->bind(commandBuffer);
 		vkCmdBindDescriptorSets(
@@ -706,11 +788,11 @@ namespace RaytracerBVHRenderer {
 		);
 		vkCmdDispatch(commandBuffer, ((this->scene->getTriangleCount() + this->scene->getSphereCount()) / 32) + 1, 1, 1);
 
-		//VkMemoryBarrier waitForWorldSpaceTransformation;
-		//waitForWorldSpaceTransformation.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
-		//waitForWorldSpaceTransformation.pNext = nullptr;
-		//waitForWorldSpaceTransformation.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
-		//waitForWorldSpaceTransformation.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
+		VkMemoryBarrier waitForWorldSpaceTransformation;
+		waitForWorldSpaceTransformation.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+		waitForWorldSpaceTransformation.pNext = nullptr;
+		waitForWorldSpaceTransformation.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
+		waitForWorldSpaceTransformation.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
 
 		std::array<VkBufferMemoryBarrier, 2> barriers;
 		barriers[0].sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
@@ -729,7 +811,7 @@ namespace RaytracerBVHRenderer {
 		barriers[1].dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
 		barriers[1].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 		barriers[1].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		barriers[1].buffer = this->scene->getTriangleBuffer()->getBuffer();
+		barriers[1].buffer = this->scene->getSphereBuffer()->getBuffer();
 		barriers[1].offset = 0;
 		barriers[1].size = VK_WHOLE_SIZE;
 
@@ -746,33 +828,42 @@ namespace RaytracerBVHRenderer {
 			nullptr
 		);
 
-		this->constructAABBPipeline->bind(commandBuffer);
+		this->enclosingAABBPipeline->bind(commandBuffer);
 		vkCmdBindDescriptorSets(
 			commandBuffer,
 			VK_PIPELINE_BIND_POINT_COMPUTE,
-			this->constructAABBPipelineLayout,
+			this->enclosingAABBPipelineLayout,
 			0,
 			1,
-			&this->constructAABBDescriptorSets[0],
+			&this->enclosingAABBDescriptorSets[0],
 			0,
 			nullptr
 		);
+		vkCmdDispatch(commandBuffer, 1, 1, 1);
 
-		vkCmdDispatch(commandBuffer, ((this->scene->getTriangleCount() + this->scene->getSphereCount()) / 32) + 1, 1, 1);
+		VkBufferMemoryBarrier enclosingAABBBarrier;
+		enclosingAABBBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+		enclosingAABBBarrier.pNext = nullptr;
+		enclosingAABBBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+		enclosingAABBBarrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+		enclosingAABBBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		enclosingAABBBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		enclosingAABBBarrier.buffer = this->mortonPrimitiveBuffer1->getBuffer();
+		enclosingAABBBarrier.offset = 0;
+		enclosingAABBBarrier.size = VK_WHOLE_SIZE;
 
-		if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
-			throw std::runtime_error("failed to record compute command buffer!");
-		}
-		
-	}
-	auto Raytracer::recordComputeS2CommandBuffer(VkCommandBuffer commandBuffer, u32 currImageIndex) -> void {
-		//static bool firstRun = true;
-		VkCommandBufferBeginInfo beginInfo{};
-		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-
-		if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
-			throw std::runtime_error("failed to begin recording compute command buffer!");
-		}
+		vkCmdPipelineBarrier(
+			commandBuffer,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			0,
+			0,
+			nullptr,
+			1,
+			&enclosingAABBBarrier,
+			0,
+			nullptr
+		);
 
 		this->generateMortonCodePipeline->bind(commandBuffer);
 		vkCmdBindDescriptorSets(
@@ -862,56 +953,62 @@ namespace RaytracerBVHRenderer {
 		);
 		vkCmdDispatch(commandBuffer, ((this->scene->getTriangleCount() + this->scene->getSphereCount()) / 256) + 1, 1, 1);
 
-		/*
-		VkImageMemoryBarrier reset;
-		reset.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-		reset.pNext = nullptr;
-		reset.srcAccessMask = 0;
-		reset.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
-		reset.oldLayout = firstRun ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		reset.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-		reset.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		reset.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		reset.image = this->computeImage;
-		reset.subresourceRange = range;
+		VkBufferMemoryBarrier bvhBarrier;
+		bvhBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+		bvhBarrier.pNext = nullptr;
+		bvhBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+		bvhBarrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+		bvhBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		bvhBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		bvhBarrier.buffer = this->mortonPrimitiveBuffer1->getBuffer();
+		bvhBarrier.offset = 0;
+		bvhBarrier.size = VK_WHOLE_SIZE;
 
 		vkCmdPipelineBarrier(
 			commandBuffer,
-			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, // src stage
-			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, // dst stage
-			0, // no dependencies
-			0, nullptr, // no memory barriers
-			0, nullptr, // no buffer memory barriers
-			1, &reset // 1 imageMemoryBarrier
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			0,
+			0,
+			nullptr,
+			1,
+			&bvhBarrier,
+			0,
+			nullptr
 		);
 
-		VkClearColorValue clearValue = { 0.0f, 0.0f, 0.0f, 1.0f };
-		vkCmdClearColorImage(
-			commandBuffer, this->computeImage,
-			VK_IMAGE_LAYOUT_GENERAL, &clearValue, 1, &range
-		);
-
-		VkImageMemoryBarrier waitForClear;
-		waitForClear.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-		waitForClear.pNext = nullptr;
-		waitForClear.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-		waitForClear.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
-		waitForClear.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
-		waitForClear.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-		waitForClear.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		waitForClear.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		waitForClear.image = this->computeImage;
-		waitForClear.subresourceRange = range;
-
-		vkCmdPipelineBarrier(
+		this->constructAABBPipeline->bind(commandBuffer);
+		vkCmdBindDescriptorSets(
 			commandBuffer,
-			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, // src stage
-			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, // dst stage
-			0, // no dependencies
-			0, nullptr, // no memory barriers
-			0, nullptr, // no buffer memory barriers
-			1, &waitForClear // 1 imageMemoryBarrier
+			VK_PIPELINE_BIND_POINT_COMPUTE,
+			this->constructAABBPipelineLayout,
+			0,
+			1,
+			&this->constructAABBDescriptorSets[0],
+			0,
+			nullptr
 		);
+		vkCmdDispatch(commandBuffer, ((this->scene->getTriangleCount() + this->scene->getSphereCount()) / 32) + 1, 1, 1);
+
+		if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
+			throw std::runtime_error("failed to record compute command buffer!");
+		}
+		firstRun = false;
+	}
+	auto Raytracer::recordComputeS2CommandBuffer(VkCommandBuffer commandBuffer, u32 currImageIndex) -> void {
+		VkCommandBufferBeginInfo beginInfo{};
+		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+		VkImageSubresourceRange range{};
+		range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		range.levelCount = VK_REMAINING_MIP_LEVELS;
+		range.layerCount = VK_REMAINING_ARRAY_LAYERS;
+		range.baseArrayLayer = 0;
+		range.baseMipLevel = 0;
+
+		if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
+			throw std::runtime_error("failed to begin recording compute command buffer!");
+		}
 
 		VkExtent2D imageSize = this->swapChain->getSwapChainExtent();
 		this->raytracePipeline->bind(commandBuffer);
@@ -974,15 +1071,12 @@ namespace RaytracerBVHRenderer {
 			0, nullptr, // no buffer memory barriers
 			1, &computeToPresent // 1 imageMemoryBarrier
 		);
-		*/
 
 		if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
 			throw std::runtime_error("failed to record compute command buffer!");
 		}
-		//firstRun = false;
 	}
 	auto Raytracer::recordGraphicsCommandBuffer(VkCommandBuffer commandBuffer, u32 currImageIndex) -> void {
-		/*
 		VkCommandBufferBeginInfo beginInfo{};
 		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 		if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
@@ -1010,7 +1104,6 @@ namespace RaytracerBVHRenderer {
 		if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
 			throw std::runtime_error("failed to record compute command buffer!");
 		}
-		*/
 	}
 	auto Raytracer::beginRenderPass(VkCommandBuffer commandBuffer, u32 currImageIndex) -> void {
 		VkRenderPassBeginInfo renderPassInfo{};

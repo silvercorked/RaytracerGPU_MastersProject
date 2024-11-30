@@ -19,25 +19,38 @@ layout(binding = 0) uniform ParameterUBO {
 	uint randomState;
 } ubo;
 
-layout(std430, binding = 1) buffer AABBBufferObject {
-	AABB aabbs[ ];
+layout(std430, binding = 1) buffer TriangleBufferObject {
+	Triangle triangles[ ];
 };
-layout(std430, binding = 2) buffer MortonPrimitivesBufferObject {
+layout(std430, binding = 2) buffer SpheresBufferObject {
+	Sphere spheres[ ];
+};
+layout(std430, binding = 3) buffer MortonPrimitivesBufferObject {
 	MortonPrimitive mortonPrimitives[ ];
 };
-layout(std430, binding = 3) buffer HLBVH {
+layout(std430, binding = 4) buffer HLBVH {
 	HLBVHNode nodes[ ]; // Leaf + internal = num elems + num elements - 1
 };
+layout(std430, binding = 5) buffer HLBVHAABBConstructionInfoBufferObject {
+	HLBVHAABBConstructionInfo constructionInfo[ ];
+};
 
-AABB combineAABB(in AABB a, in AABB b) {
-	AABB combined;
-	combined.minX = min(a.minX, b.minX);
-	combined.maxX = max(a.maxX, b.maxX);
-	combined.minY = min(a.minY, b.minY);
-	combined.maxY = max(a.maxY, b.maxY);
-	combined.minZ = min(a.minZ, b.minZ);
-	combined.maxZ = max(a.maxZ, b.maxZ);
-	return combined;
+const float DELTA = 0.001;
+const float PADDING = DELTA / 2;
+
+void padAABB(inout AABB box) {
+	if (box.maxX - box.minX < DELTA) {
+		box.minX -= PADDING;
+		box.maxX += PADDING;
+	}
+	if (box.maxY - box.minY < DELTA) {
+		box.minY -= PADDING;
+		box.maxY += PADDING;
+	}
+	if (box.maxZ - box.minZ < DELTA) {
+		box.minZ -= PADDING;
+		box.maxZ += PADDING;
+	}
 }
 
 // returns the index of the most signficant bit of difference between mortoncodes for primitives at i and j
@@ -48,9 +61,11 @@ int delta(int i, int j) {
 	}
 	uint codeI = mortonPrimitives[i].code;
 	uint codeJ = mortonPrimitives[j].code;
-	if (codeI == codeJ) { // duplicate mortoncodes
-		uint elemIdI = mortonPrimitives[i].aabbIndex;
-		uint elemIdJ = mortonPrimitives[j].aabbIndex;
+	if (codeI == codeJ) { // duplicate mortoncodes // get unique id beside morton code to make a prefix length
+		uint elemIdI = mortonPrimitives[i].primitiveIndex
+			+ (ubo.numTriangles * (mortonPrimitives[i].primitiveType == SPHERE_PRIMITIVE ? 1 : 0)); // need to scale in case of sphere
+		uint elemIdJ = mortonPrimitives[j].primitiveIndex
+			+ (ubo.numTriangles * (mortonPrimitives[j].primitiveType == SPHERE_PRIMITIVE ? 1 : 0));
 		return 32 + 31 - findMSB(elemIdI ^ elemIdJ);
 	}
 	return 31 - findMSB(codeI ^ codeJ);
@@ -102,17 +117,55 @@ int findSplit(int first, int last) {
 	return split;
 }
 
+AABB getSphereAABB(uint sphereIndex) {
+	AABB box;
+	Sphere s = spheres[sphereIndex];
+	vec3 radiusVec = s.radius.xxx; // fancy swizzling
+	vec3 l = s.center.xyz - s.radius;
+	vec3 r = s.center.xyz + s.radius;
+	box.minX = min(l.x, r.x);
+	box.maxX = max(l.x, r.x);
+	box.minY = min(l.y, r.y);
+	box.maxY = max(l.y, r.y);
+	box.minZ = min(l.z, r.z);
+	box.maxZ = max(l.z, r.z);
+	return box;
+}
+
+AABB getTriangleAABB(uint triangleIndex) {
+	AABB box;
+	Triangle t = triangles[triangleIndex];
+	vec4 outerPoint = t.v0 + (t.v1 - t.v0) + (t.v2 - t.v0);
+	box.minX = min(t.v0.x, outerPoint.x);
+	box.maxX = max(t.v0.x, outerPoint.x);
+	box.minY = min(t.v0.y, outerPoint.y);
+	box.maxY = max(t.v0.y, outerPoint.y);
+	box.minZ = min(t.v0.z, outerPoint.z);
+	box.maxZ = max(t.v0.z, outerPoint.z);
+	return box;
+}
+
 void main() {
 	uint globalWGInvoID = gl_GlobalInvocationID.x;
 	uint localWGInvoID = gl_LocalInvocationID.x;
 	const int primitiveCount = int(ubo.numTriangles + ubo.numSpheres);
-	const int LEAF_OFFSET = primitiveCount - 1;
+	const int leafOffset = primitiveCount - 1;
 
 	// leaf nodes
 	if (globalWGInvoID < primitiveCount) {
-		AABB curr = aabbs[mortonPrimitives[globalWGInvoID].aabbIndex]; // requires that globalWGInvoID >= primitive count on workgroup invocation
+		AABB curr;
+		uint type;
+		if (globalWGInvoID < ubo.numTriangles) {
+			type = TRIANGLE_PRIMITIVE;
+			curr = getTriangleAABB(globalWGInvoID); // requires that globalWGInvoID >= primitive count on workgroup invocation
+		}
+		else {
+			type = SPHERE_PRIMITIVE;
+			curr = getSphereAABB(globalWGInvoID - ubo.numTriangles); // requires that globalWGInvoID >= primitive count on workgroup invocation
+		}
+		padAABB(curr);
 		// could modify with for loop like in radix sort to allow smaller workgroup
-		nodes[LEAF_OFFSET + globalWGInvoID] = HLBVHNode(curr, INVALID_HLBVHNODE_INDEX, INVALID_HLBVHNODE_INDEX, curr.index);
+		nodes[leafOffset + globalWGInvoID] = HLBVHNode(curr, INVALID_HLBVHNODE_INDEX, INVALID_HLBVHNODE_INDEX, globalWGInvoID, type);
 	}
 
 	// internal nodes
@@ -127,7 +180,7 @@ void main() {
 		// get left child
 		int leftChild = -1;
 		if (split == first) {
-			leftChild = LEAF_OFFSET + split; // index of leaf node
+			leftChild = leafOffset + split; // index of leaf node
 		}
 		else {
 			leftChild = split; // index of internal node
@@ -136,20 +189,27 @@ void main() {
 		// get right child
 		int rightChild = -1;
 		if (split + 1 == last) {
-			rightChild = LEAF_OFFSET + split + 1; 
+			rightChild = leafOffset + split + 1; 
 		}
 		else {
 			rightChild = split + 1;
 		}
 
 		// create internal node
-		AABB left = aabbs[mortonPrimitives[leftChild].aabbIndex];
-		AABB right = aabbs[mortonPrimitives[rightChild].aabbIndex];
 		nodes[globalWGInvoID] = HLBVHNode(
-			combineAABB(left, right),
+			AABB(0, 0, 0, 0, 0, 0), // can't set AABB yet, as we are making all internal nodes at once. need extra step to go bottom up
 			leftChild,
 			rightChild,
-			0 // these are all non-leaf nodes, ie, they don't have a primitive and only connect to other hlbvh nodes
+			INVALID_HLBVHNODE_INDEX, // these are all non-leaf nodes, ie, they don't have a primitive and only connect to other hlbvh nodes
+			0 // type info (no real type so just 0)
 		);
+
+		constructionInfo[leftChild] = HLBVHAABBConstructionInfo(globalWGInvoID, 0);
+		constructionInfo[rightChild] = HLBVHAABBConstructionInfo(globalWGInvoID, 0);
+		// these 2 make a construction info corresponding to every hlbvh node index except the root
+	}
+
+	if (globalWGInvoID == 0) { // setup root node construction info
+		constructionInfo[0] = HLBVHAABBConstructionInfo(0, 0);
 	}
 }
