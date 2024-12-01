@@ -155,17 +155,20 @@ void main() {
 	if (globalWGInvoID < primitiveCount) {
 		AABB curr;
 		uint type;
+		uint primIndex;
 		if (globalWGInvoID < ubo.numTriangles) {
 			type = TRIANGLE_PRIMITIVE;
-			curr = getTriangleAABB(globalWGInvoID); // requires that globalWGInvoID >= primitive count on workgroup invocation
+			primIndex = globalWGInvoID;
+			curr = getTriangleAABB(primIndex); // requires that globalWGInvoID >= primitive count on workgroup invocation
 		}
 		else {
 			type = SPHERE_PRIMITIVE;
-			curr = getSphereAABB(globalWGInvoID - ubo.numTriangles); // requires that globalWGInvoID >= primitive count on workgroup invocation
+			primIndex = globalWGInvoID - ubo.numTriangles;
+			curr = getSphereAABB(primIndex); // requires that globalWGInvoID >= primitive count on workgroup invocation
 		}
 		padAABB(curr);
 		// could modify with for loop like in radix sort to allow smaller workgroup
-		nodes[leafOffset + globalWGInvoID] = HLBVHNode(curr, INVALID_HLBVHNODE_INDEX, INVALID_HLBVHNODE_INDEX, globalWGInvoID, type);
+		nodes[leafOffset + globalWGInvoID] = HLBVHNode(curr, INVALID_HLBVHNODE_INDEX, INVALID_HLBVHNODE_INDEX, primIndex, type);
 	}
 
 	// internal nodes

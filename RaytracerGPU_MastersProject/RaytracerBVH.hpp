@@ -204,6 +204,8 @@ namespace RaytracerBVHRenderer {
 		auto createGraphicsCommandBuffers() -> void;
 
 		auto doIteration(f32 frameTime) -> void {
+			static auto currentTime = std::chrono::high_resolution_clock::now();
+			static auto newTime = std::chrono::high_resolution_clock::now();
 			std::cout << std::format("iteration: {}\n", this->iteration);
 
 			constexpr const auto materialTypeToString = [](SceneTypes::MaterialType mt) -> std::string {
@@ -263,6 +265,10 @@ namespace RaytracerBVHRenderer {
 			u32 frameIndex = imageIndex % SwapChain::MAX_FRAMES_IN_FLIGHT;
 			// number of frames currently rendering and number of images in swap chain are not the same
 
+			newTime = std::chrono::high_resolution_clock::now();
+			auto prevPresentTime = std::chrono::duration_cast<std::chrono::microseconds>(newTime - currentTime);
+			currentTime = newTime;
+
 			this->scene->updateScene();
 			this->scene->getCamera().updateCameraForFrame(this->window, frameTime, this->swapChain->extentAspectRatio());
 
@@ -280,7 +286,7 @@ namespace RaytracerBVHRenderer {
 					);
 				}
 			}
-			if constexpr (Config::ShowBufferDebug) {
+			/*if constexpr (Config::ShowBufferDebug) {
 				std::cout << "before\n";
 				auto resultFromGPU = this->DEBUGgetDeployedBufferAs<SceneTypes::GPU::Sphere>(
 					this->scene->getSphereBuffer()->getBuffer(),
@@ -304,7 +310,7 @@ namespace RaytracerBVHRenderer {
 						triangles[i].materialIndex, triangles[i].modelIndex
 					);
 				}
-			}
+			}*/
 			if constexpr (Config::ShowBufferDebug) {
 				auto resultFromGPU = this->DEBUGgetDeployedBufferAs<f32>(
 					this->scratchBuffer->getBuffer(),
@@ -377,6 +383,10 @@ namespace RaytracerBVHRenderer {
 			submitInfoS1.pCommandBuffers = &this->computeS1CommandBuffers[frameIndex];
 
 			vkResetFences(this->device.device(), 1, &this->computeS1Complete);
+			newTime = std::chrono::high_resolution_clock::now();
+			auto prepForCompute1Time = std::chrono::duration_cast<std::chrono::microseconds>(newTime - currentTime);
+			currentTime = newTime;
+
 			auto subRes1 = vkQueueSubmit(this->device.computeQueue(), 1, &submitInfoS1, this->computeS1Complete);
 			if (subRes1 != VK_SUCCESS)
 				throw std::runtime_error("failed to submit compute command buffer!");
@@ -384,6 +394,10 @@ namespace RaytracerBVHRenderer {
 			auto waitForComputeResult1 = vkWaitForFences(this->device.device(), 1, &this->computeS1Complete, VK_TRUE, UINT64_MAX);
 			if (waitForComputeResult1 != VK_SUCCESS)
 				throw std::runtime_error("failed to submit draw command buffer!");
+
+			newTime = std::chrono::high_resolution_clock::now();
+			auto compute1Time = std::chrono::duration_cast<std::chrono::microseconds>(newTime - currentTime);
+			currentTime = newTime;
 			
 			if constexpr (Config::ShowBufferDebug) {
 				auto mortonPrimitives = this->DEBUGgetDeployedBufferAs<SceneTypes::GPU::MortonPrimitive>(
@@ -443,15 +457,30 @@ namespace RaytracerBVHRenderer {
 			submitInfoS2.pCommandBuffers = &this->computeS2CommandBuffers[frameIndex];
 
 			vkResetFences(this->device.device(), 1, &this->computeS2Complete);
+			newTime = std::chrono::high_resolution_clock::now();
+			auto prepForCompute2Time = std::chrono::duration_cast<std::chrono::microseconds>(newTime - currentTime);
+			currentTime = newTime;
+
 			auto subRes2 = vkQueueSubmit(this->device.computeQueue(), 1, &submitInfoS2, this->computeS2Complete);
 
 			auto waitForComputeResult2 = vkWaitForFences(this->device.device(), 1, &this->computeS2Complete, VK_TRUE, UINT64_MAX);
 			if (waitForComputeResult2 != VK_SUCCESS)
 				throw std::runtime_error("failed to submit draw command buffer!");
 
-			vkResetFences(this->device.device(), 1, &this->computeS2Complete);
+			newTime = std::chrono::high_resolution_clock::now();
+			auto compute2Time = std::chrono::duration_cast<std::chrono::microseconds>(newTime - currentTime);
+			currentTime = newTime;
 
 			this->swapChain->submitCommandBuffers(&this->graphicsCommandBuffer, &imageIndex);
+
+			std::cout << std::format(
+				"\tprevPresentTime: {}, Compute1Time: {}, compute2Time: {}"
+				"\n\tprepForCompute1Time: {}, prepForCompute2Time: {}"
+				"\n\tTotal BVH Build Time: {}, Total Raytracing Time: {}, otherTime: {}\n",
+				prevPresentTime, compute1Time, compute2Time,
+				prepForCompute1Time, prepForCompute2Time,
+				prepForCompute1Time + compute1Time, prepForCompute2Time + compute2Time, prevPresentTime
+			);
 		}
 
 		auto recordComputeS1CommandBuffer(VkCommandBuffer, u32) -> void;

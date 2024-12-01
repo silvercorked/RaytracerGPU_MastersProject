@@ -75,19 +75,19 @@ void main() {
 		MortonPrimitive mp;
 		vec3 center;
 		if (i < ubo.numTriangles) {
-			center = getTriangleCenter(triangles[i]);
+			mp.primitiveIndex = i;
+			center = getTriangleCenter(triangles[mp.primitiveIndex]);
 			mp.primitiveType = TRIANGLE_PRIMITIVE;
 		}
 		else {
-			i = i - ubo.numTriangles;
-			center = spheres[i].center.xyz;
+			mp.primitiveIndex = i - ubo.numTriangles;
+			center = spheres[mp.primitiveIndex].center.xyz;
 			mp.primitiveType = SPHERE_PRIMITIVE;
 		}
 
 		uvec3 quantizedCoord = quantizeForMorton(center);
 		
 		mp.code = mortonCode3D(quantizedCoord);
-		mp.primitiveIndex = i;
 		
 		mortonPrimitives[i] = mp;
 	}
