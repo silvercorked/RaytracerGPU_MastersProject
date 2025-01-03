@@ -277,7 +277,7 @@ namespace RaytracerRenderer {
 		);
 
 		this->scene = std::make_unique<RaytraceScene>(this->device);
-		cornellBoxScene(this->scene);
+		complexScene(this->scene);
 	}
 
 	auto Raytracer::createUniformBuffers() -> void {

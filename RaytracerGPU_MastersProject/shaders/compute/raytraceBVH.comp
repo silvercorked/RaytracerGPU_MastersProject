@@ -33,14 +33,23 @@ layout(std430, binding = 4) readonly buffer MaterialBufferObject {
 	Material materials[ ];
 };
 
-layout(std430, binding = 5) buffer scratchBufferObject {
+layout(std430, binding = 5) readonly buffer HLBVHBufferObject {
+	HLBVHNode nodes[ ];
+};
+
+layout(std430, binding = 6) buffer scratchBufferObject {
 	float scratch[ ];
 };
+
+#define testX 175
+#define testY 650
+
+#define MAX_STACK_DEPTH 128
 
 // constants
 const float _FOCAL_DISTANCE = 10.0f;
 const float _DEFOCUS_ANGLE = 0.0f;
-const vec3 _BACKGROUND_COLOR = vec3(0.1, 0.1, 0.3);
+const vec3 _BACKGROUND_COLOR = vec3(0);
 
 vec2 _imageDimensions = vec2(imageSize(outputImage));
 float _aspectRatio = float(_imageDimensions.x) / float(_imageDimensions.y);
@@ -89,9 +98,16 @@ vec3 emitted(in HitRecord rec, inout vec3 point) {
 	return vec3(0);
 }
 bool scatter(in Ray rIn, in HitRecord rec, out vec3 attenuation, out Ray scattered) {
+	//if (gl_GlobalInvocationID.x == testX && gl_GlobalInvocationID.y == testY) {
+	//	scratch[17] = 17;
+	//}
 	if (materials[rec.materialIndex].materialType == DIFFUSE_MATERIAL) {
 		attenuation = materials[rec.materialIndex].albedo.xyz; // can upgrade to texture later
 		scattered = Ray(rec.p, normalize(rec.normal + randomUnitVector()));
+		//if (gl_GlobalInvocationID.x == testX && gl_GlobalInvocationID.y == testY) {
+		//	scratch[18] = 18;
+		//	scratch[19] = attenuation.x;
+		//}
 		return true;
 	}
 	return false;
@@ -164,32 +180,100 @@ bool sphereHit(in uint sphereIndex, in Ray r, in float tMin, in float tMax, inou
 	return true;
 }
 
+// https://github.com/silvercorked/RaytracerInAWeekend/blob/main/Raytracer/AxisAlignedBoundingBox.hpp#L47
+bool AABBhitCheck(Ray r, vec3 boxMin, vec3 boxMax) { // only checks if a hit occurs and doesn't record anything else
+	vec3 tMin = (boxMin - r.origin) / r.direction;
+	vec3 tMax = (boxMax - r.origin) / r.direction;
+	// if 1 / r.direction < 0, need to swap tmin and tmax, but can avoid if using max and min functions
+	vec3 t1 = min(tMin, tMax);
+	vec3 t2 = max(tMin, tMax);
+	float tNear = max(max(t1.x, t1.y), t1.z);
+	float tFar = min(min(t2.x, t2.y), t2.z);
+	return tNear < tFar;
+}
+
+bool hitBVH(in Ray r, in float tMin, in float tMax, out HitRecord rec) {
+	bool hit = false;
+	float closestSoFar = tMax;
+
+	uint stack[MAX_STACK_DEPTH];
+	uint toVisitOffset = 0;
+	uint currentNodeIndex = 0;
+
+	//if (gl_GlobalInvocationID.x == testX && gl_GlobalInvocationID.y == testY) {
+	//	scratch[6] = 1;
+	//}
+
+	while (true) {
+		HLBVHNode node = nodes[currentNodeIndex];
+		if (
+			AABBhitCheck(r, vec3(node.aabb.minX, node.aabb.minY, node.aabb.minZ), vec3(node.aabb.maxX, node.aabb.maxY, node.aabb.maxZ))
+		) { // AABB hit case
+			//scratch[9] = 9;
+			if (node.leftIndex == INVALID_HLBVHNODE_INDEX && node.rightIndex == INVALID_HLBVHNODE_INDEX) { // leaf node case
+				//if (gl_GlobalInvocationID.x == testX && gl_GlobalInvocationID.y == testY) {
+				//	scratch[10] = 10;
+				//}
+				if (node.primitiveType == SPHERE_PRIMITIVE) {
+					if (sphereHit(node.primitiveIndex, r, tMin, closestSoFar, rec)) {
+						hit = true;
+						closestSoFar = rec.t;
+					}
+				}
+				else if (node.primitiveType == TRIANGLE_PRIMITIVE) {
+					//if (gl_GlobalInvocationID.x == testX && gl_GlobalInvocationID.y == testY) {
+					//	scratch[11] = 11;
+					//}
+					if (triangleHit(node.primitiveIndex, r, tMin, closestSoFar, rec)) {
+						hit = true;
+						closestSoFar = rec.t;
+						//if (gl_GlobalInvocationID.x == testX && gl_GlobalInvocationID.y == testY) {
+						//	scratch[12] = 12;
+						//}
+					}
+				}
+
+				if (toVisitOffset == 0) { // check if anything else in stack
+					break; // if nothing, all done
+				}
+				currentNodeIndex = stack[--toVisitOffset]; // else continue down stack
+			} // end leaf node case
+			else { // internal node case (check right then left)
+				stack[toVisitOffset++] = node.leftIndex;
+				currentNodeIndex = node.rightIndex;
+			}
+		}
+		else { // AABB miss case
+			//if (gl_GlobalInvocationID.x == testX && gl_GlobalInvocationID.y == testY) {
+			//	scratch[8] = 8;
+			//}
+			if (toVisitOffset == 0) {
+				break;
+			}
+			currentNodeIndex = stack[--toVisitOffset];
+		}
+	}
+	if (gl_GlobalInvocationID.x == testX && gl_GlobalInvocationID.y == testY) {
+		if (hit) {
+			scratch[7] = 2;
+		}
+		else {
+			scratch[7] = 1;
+		}
+	}
+	return hit;
+}
+
 bool sceneHit(in Ray r, out HitRecord rec) {
 	float tMin = 0.001;
 	float tMax = 10000000;
-	HitRecord temp;
-	bool hitAny = false;
-	float closestSoFar = tMax;
-	uint i = 0;
-	for (; i < ubo.numTriangles; i++) {
-		if (triangleHit(i, r, tMin, closestSoFar, temp)) {
-			hitAny = true;
-			closestSoFar = temp.t;
-			rec = temp;
-		}
-	}
-	i = 0;
-	for (; i < ubo.numSpheres; i++) {
-		if (sphereHit(i, r, tMin, closestSoFar, temp)) {
-			hitAny = true;
-			closestSoFar = temp.t;
-			rec = temp;
-		}
-	}
-	return hitAny;
+
+	bool hit = hitBVH(r, tMin, tMax, rec);
+	
+	return hit;
 }
 
-vec3 rayColor(inout Ray r) {
+vec3 rayColor(in Ray r) {
 	HitRecord rec;
 	vec3 color = vec3(0);
 	vec3 globalAttenuation = vec3(1);
@@ -201,15 +285,31 @@ vec3 rayColor(inout Ray r) {
 			break;
 		}
 		else {
+			if (gl_GlobalInvocationID.x == testX && gl_GlobalInvocationID.y == testY) {
+				scratch[13] = 13;
+			}
 			vec3 attenuation;
 			vec3 emittedColor = emitted(rec, rec.p);
 			color += emittedColor * globalAttenuation;
 			bool scattered = scatter(curr, rec, attenuation, curr);
 			globalAttenuation *= attenuation;
+			if (gl_GlobalInvocationID.x == testX && gl_GlobalInvocationID.y == testY) {
+				scratch[0] = emittedColor.x;
+				scratch[1] = emittedColor.y;
+				scratch[2] = emittedColor.z;
+				scratch[3] = attenuation.x;
+				scratch[4] = attenuation.y;
+				scratch[5] = attenuation.z;
+			}
 			
 			if (!scattered)
 				break;
 		}
+	}
+	if (gl_GlobalInvocationID.x == testX && gl_GlobalInvocationID.y == testY) {
+		scratch[14] = color.x;
+		scratch[15] = color.y;
+		scratch[16] = color.z;
 	}
 	return color;
 }
@@ -242,52 +342,34 @@ Ray getRay(in vec2 xy) {
 }
 
 // vkCmdDispatch(commandBuffer, outImageWidth + 1, outImageHeight + 1, n); // will do n ray casts per pixel of output image
-// if extra size is sent ((1920/32) = 60, but (1080/32) = 33.75, so ~60x34 -> 2040 threads should be used on the gpu for 1 1920x1080 image with a single ray
-// extra size will be effectively ignored via the behavior of the imageLoad and imageStore functions
-// https://www.khronos.org/opengl/wiki/Image_Load_Store#Image_load
-void main() { // gl_GlobalInvocationID.xy represents pixel locations
+void main() {
 	if (gl_GlobalInvocationID.x >= _imageDimensions.x || gl_GlobalInvocationID.y >= _imageDimensions.y)
 		return; // discard any extra allocated ones
 
-	// add gathered color to outputImage's current color
-	vec4 currentColor = imageLoad(outputImage, ivec2(gl_GlobalInvocationID.xy)).rgba; // image is initially cleared, so (0, 0, 0, 0) at first
+	vec4 currentColor = imageLoad(outputImage, ivec2(gl_GlobalInvocationID.xy)).rgba;
 	rngState += uint(currentColor.a * 4294967294.0f); // 4294967295.0f causes stagnation
 	stepRNG(rngState);
-	float nextRandom = random();// alpha is ignored in fragment shader, so use it to store random
-		// this let's successive rays out of the same pixel with the same ubo.randomstate behavior differently // float 0-1
+	float nextRandom = random();
+
 	Ray r = getRay(gl_GlobalInvocationID.xy);
-	// cuda core (nvinda) or SM, task (1M pixels per screen, only ~4000 per fancy gpus)
-	// get ray color
+
 	vec3 pixelColor = rayColor(r);
 
-	//if (gl_GlobalInvocationID.x == 200 && gl_GlobalInvocationID.y == 200) {
-		//scratch[0] += currentColor.x;
-		//scratch[1] = currentColor.y;
-		//scratch[2] = currentColor.z;
-		//scratch[3] = pixelColor.x;
-		//scratch[4] = pixelColor.y;
-		//scratch[5] = pixelColor.z;
-	//}
-	vec4 newColor = vec4(pixelColor + currentColor.xyz, nextRandom);
-	//if (gl_GlobalInvocationID.x == 20 && gl_GlobalInvocationID.y == 20) {
-		//scratch[6] = newColor.x;
-		//scratch[7] = newColor.y;
-		//scratch[8] = newColor.z;
-		//uint index = uint((currentColor.a >= 1 ? currentColor.a - floor(currentColor.a) : currentColor.a) * 10);
-		//if (index < 20) {
-		//	scratch[0] += pixelColor.x;
-		//	scratch[1] += pixelColor.y;
-		//	scratch[2] += pixelColor.z;
-		//	scratch[3] = r.direction.x;
-		//	scratch[4] = r.direction.y;
-		//	scratch[5] = r.direction.z;
-		//scratch[13] = ubo.randomState;
-		//scratch[14] = currentColor.a;
-		//scratch[15] = nextRandom;
-		//scratch[16] = newColor.a;
-	//}
-	imageStore(outputImage, ivec2(gl_GlobalInvocationID.xy), newColor);
+	/*if (gl_GlobalInvocationID.x == testX && gl_GlobalInvocationID.y == testY) {
+		scratch[0] = pixelColor.x;
+		scratch[1] = pixelColor.y;
+		scratch[2] = pixelColor.z;
 
-	// another pass may be needed for adding the gamma-correction term, as the entire image needs to be done
-	// (see color.hpp in Raytracer project)
+		HitRecord rec;
+		rec.t = 0;
+		rec.materialIndex = 100;
+		bool hit = hitBVH(r, 0.000001, 274, rec);
+		scratch[3] = hit ? 1 : 0;
+		scratch[4] = rec.t;
+		scratch[5] = rec.materialIndex;
+	}*/
+
+	vec4 newColor = vec4(pixelColor + currentColor.xyz, nextRandom);
+	
+	imageStore(outputImage, ivec2(gl_GlobalInvocationID.xy), newColor);
 }

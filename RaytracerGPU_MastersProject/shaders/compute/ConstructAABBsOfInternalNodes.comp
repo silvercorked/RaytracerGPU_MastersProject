@@ -1,0 +1,65 @@
+#version 450
+
+layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
+
+#include "../include/definitions.glsl"
+
+layout(binding = 0) uniform ParameterUBO {
+	vec4 camPos; // ignore w
+	vec4 camLookAt; // ignore w
+	vec4 camUpDir; // ignore w
+	float verticalFOV;
+	uint numTriangles;
+	uint numSpheres;
+	uint numMaterials;
+	uint numLights;
+	uint maxRayTraceDepth;
+	uint randomState;
+} ubo;
+
+layout(std430, binding = 1) coherent buffer HLBVH {
+	HLBVHNode nodes[ ]; // Leaf + internal = num elems + num elements - 1
+}; // writes to aabb's need to be flushed so they are always ready for when visitations occur, thus coherent
+layout(std430, binding = 2) buffer HLBVHAABBConstructionInfoBufferObject {
+	HLBVHAABBConstructionInfo constructionInfo[ ];
+};
+
+AABB combineAABB(in AABB a, in AABB b) {
+	AABB combined;
+	combined.minX = min(a.minX, b.minX);
+	combined.maxX = max(a.maxX, b.maxX);
+	combined.minY = min(a.minY, b.minY);
+	combined.maxY = max(a.maxY, b.maxY);
+	combined.minZ = min(a.minZ, b.minZ);
+	combined.maxZ = max(a.maxZ, b.maxZ);
+	return combined;
+}
+
+void main() {
+	uint globalWGInvoId = gl_GlobalInvocationID.x;
+	uint localWGInvoId = gl_LocalInvocationID.x;
+	const int primitiveCount = int(ubo.numTriangles + ubo.numSpheres);
+	const int leafOffset = primitiveCount - 1;
+
+	if (globalWGInvoId >= primitiveCount) {
+		return;
+	}
+
+	uint nodeId = constructionInfo[leafOffset + globalWGInvoId].parent;
+	while (true) {
+		int visitations = atomicAdd(constructionInfo[nodeId].visitationCount, 1);
+		if (visitations < 1) {
+			return; // other child is not computed yet, so can't set AABB
+		}
+		// only get to if second visitation occurs. additional visitations drop off one by one so that there's never more than needed and a third visit never occurs
+		HLBVHNode node = nodes[nodeId];
+		HLBVHNode left = nodes[node.leftIndex];
+		HLBVHNode right = nodes[node.rightIndex];
+		node.aabb = combineAABB(left.aabb, right.aabb);
+		nodes[nodeId] = node;
+		if (nodeId == 0) {
+			return; // if root, nothing more to do
+		}
+		nodeId = constructionInfo[nodeId].parent; // go up
+	}
+}

@@ -2,6 +2,8 @@
 #include "RaytraceScene.hpp"
 
 #include "utils.hpp"
+#include "../utils/Functions.hpp"
+#include "../utils/Functors.hpp"
 
 #include <variant>
 #include <memory>
@@ -56,9 +58,9 @@ auto RaytraceScene::getGameObject(GameObjectId id) -> GameObject& {
 	}
 }
 
-auto RaytraceScene::getGameObject(size_t index) -> GameObject& {
-	return this->gameObjects.at(index);
-}
+//auto RaytraceScene::getGameObject(size_t index) -> GameObject& {
+//	return this->gameObjects.at(index);
+//}
 
 auto RaytraceScene::removeGameObject(GameObjectId id) -> bool {
 	return false; // TODO
@@ -190,10 +192,11 @@ auto RaytraceScene::moveGameObjectsToHostVectors() -> void {
 			);
 		}
 	}
-	this->modelCount = static_cast<u32>(this->models.size());
-	this->triangleCount = static_cast<u32>(this->triangles.size());
-	this->sphereCount = static_cast<u32>(this->spheres.size());
-	this->materialCount = static_cast<u32>(this->materials.size());
+	this->modelCount = static_cast<u32>(glm::max<size_t>(this->models.size(), 1));
+	this->triangleCount = static_cast<u32>(glm::max<size_t>(this->triangles.size(), 1));
+	this->sphereCount = static_cast<u32>(glm::max<size_t>(this->spheres.size(), 1));
+	this->materialCount = static_cast<u32>(glm::max<size_t>(this->materials.size(), 1));
+	// need min 1 to allocate. if 1 is allocated and none present, works fine, just ignores extra allocated space till used
 }
 
 auto RaytraceScene::createModelBuffer() -> void {

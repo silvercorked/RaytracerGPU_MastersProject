@@ -1,0 +1,110 @@
+#version 460
+
+#extension GL_KHR_shader_subgroup_basic: enable
+#extension GL_KHR_shader_subgroup_arithmetic: enable
+
+#define WORKGROUP_SIZE 256
+
+layout(local_size_x = WORKGROUP_SIZE) in;
+
+#include "../include/definitions.glsl"
+
+layout(binding = 0) uniform ParameterUBO {
+	vec4 camPos; // ignore w
+	vec4 camLookAt; // ignore w
+	vec4 camUpDir; // ignore w
+	float verticalFOV;
+	uint numTriangles;
+	uint numSpheres;
+	uint numMaterials;
+	uint numLights;
+	uint maxRayTraceDepth;
+	uint randomState;
+} ubo;
+
+layout(binding = 1) coherent buffer EnclosingAABBSSBO {
+	vec4 eMin;
+	vec4 eMax;
+} enclosingAABB;
+
+layout(std430, binding = 2) buffer TriangleBufferObject {
+	Triangle triangles[ ];
+};
+layout(std430, binding = 3) buffer SpheresBufferObject {
+	Sphere spheres[ ];
+};
+layout(std430, binding = 4) buffer scratchBufferObject {
+	float scratch[ ];
+};
+
+vec3 getTriangleCenter(Triangle t) { // just getting the centroid.
+	return ((t.v0 + t.v1 + t.v2) / 3).xyz;
+}
+
+shared uint semaphore;
+
+const float DELTA = 0.001;
+const float PADDING = DELTA / 2;
+
+void padAABB(inout vec4 minimum, inout vec4 maximum) {
+	if (maximum.x - minimum.x < DELTA) {
+		minimum.x -= PADDING;
+		maximum.x += PADDING;
+	}
+	if (maximum.y - minimum.y < DELTA) {
+		minimum.y -= PADDING;
+		maximum.y += PADDING;
+	}
+	if (maximum.z - minimum.z < DELTA) {
+		minimum.z -= PADDING;
+		maximum.z += PADDING;
+	}
+}
+
+void main() {
+	uint workGroupInvoID = gl_LocalInvocationID.x;
+	uint subGroupID = gl_SubgroupID;
+	uint subGroupInvoId = gl_SubgroupInvocationID;
+	const uint primitiveCount = ubo.numTriangles + ubo.numSpheres;
+	vec3 localMin;
+	vec3 localMax;
+
+	if (workGroupInvoID == 0) {
+		enclosingAABB.eMin = vec4( 1000000000.0); // preset min and max so they likely get overwritten, removing past values
+		enclosingAABB.eMax = vec4(-1000000000.0); // and avoiding putting 0,0,0 in if it not anywhere near
+		atomicAnd(semaphore, 0); // setup semaphore to 0
+	}
+
+	barrier(); // await semaphore set
+
+	// simplest using a single workgroup cause size is known (ie, can do elemIndex += WORKGROUP_SIZE) and be guarenteed unique elements between invocations
+	for (uint elemIndex = workGroupInvoID; elemIndex < primitiveCount; elemIndex += WORKGROUP_SIZE) { // jump through primitives array
+		vec3 center;
+		if (elemIndex < ubo.numTriangles) {
+			center = getTriangleCenter(triangles[elemIndex]);
+		}
+		else {
+			center = spheres[elemIndex - ubo.numTriangles].center.xyz;
+		}
+		localMin = min(center, localMin);
+		localMax = max(center, localMax);
+	}
+
+	barrier(); // await localMin being calculated, then do subgroup operation (idk if necessary, prob just a noop)
+	localMin = subgroupMin(localMin);
+	localMax = subgroupMax(localMax);
+
+	if (workGroupInvoID < primitiveCount && subGroupInvoId == 0) { // only invocations with respective primitives. otherwise junk from localMin and localMax could get in
+		while (semaphore != subGroupID); // wait for turn
+
+		enclosingAABB.eMin = min(enclosingAABB.eMin, vec4(localMin, 0));
+		enclosingAABB.eMax = max(enclosingAABB.eMax, vec4(localMax, 0));
+		atomicAdd(semaphore, 1); // signal next to go
+	}
+
+	barrier(); // wait for final enclosing AABB to be figured out, then pad it, so stuff aint so close
+
+	if (workGroupInvoID == 0) {
+		padAABB(enclosingAABB.eMin, enclosingAABB.eMax);
+	}
+}

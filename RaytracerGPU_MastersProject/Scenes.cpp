@@ -268,9 +268,9 @@ auto cornellBoxScene(std::unique_ptr<RaytraceScene>& scene) -> void {
 
 	GameObject cube2 = GameObject::createGameObject();
 	cube2.setModel(cubeWhite, true);
-	cube2.transform.translation = { 180.0f, 80.0f, 175.0f };
+	cube2.transform.translation = { 180.0f, 160.0f, 175.0f };
 	cube2.transform.scale = { 80.0f, 80.0f, 80.0f };
-	cube2.transform.rotation = { 0, glm::radians(-18.0f), 0 };
+	cube2.transform.rotation = { 0, glm::radians(-18.0f), 0}; // glm::radians(45.0f), glm::radians(-45.0f), glm::radians(45.0f)
 
 	scene->addGameObject(std::move(cube1));
 	scene->addGameObject(std::move(cube2));
@@ -278,11 +278,121 @@ auto cornellBoxScene(std::unique_ptr<RaytraceScene>& scene) -> void {
 	std::shared_ptr<RTModel> sphere = loadModel(1.0f, whiteDiff);
 	GameObject dummySphere = GameObject::createGameObject();
 	dummySphere.setModel(sphere, false);
-	dummySphere.transform.translation = { -50000, -50000, -50000 }; // requires 1 sphere min rn, so just throw this out of the way
+	dummySphere.transform.translation = { -200.0f, 215.0f, -50.0f }; // requires 1 sphere min rn, so just throw this out of the way
 	scene->addGameObject(std::move(dummySphere));
 
 	scene->setRaysPerPixel(128);
 	scene->setMaxRaytraceDepth(25);
+	scene->getCamera().setVerticalFOV(40.0f);
+	scene->prepForRender();
+}
+
+auto simpleScene(std::unique_ptr<RaytraceScene>& scene) -> void {
+	SceneTypes::Material light(glm::vec3(15.0, 15.0, 15.0), SceneTypes::MaterialType::LIGHT);
+	SceneTypes::Material whiteDiff(glm::vec3(0.73, 0.73, 0.73), SceneTypes::MaterialType::DIFFUSE);
+	SceneTypes::Material redDiff(glm::vec3(0.65, 0.05, 0.05), SceneTypes::MaterialType::DIFFUSE);
+	std::shared_ptr<RTModel> quadLight = loadModel("models/quad.obj", light);
+	std::shared_ptr<RTModel> quadWhite = loadModel("models/quad.obj", whiteDiff);
+	std::shared_ptr<RTModel> quadRed = loadModel("models/quad.obj", redDiff);
+
+	TransformComponent t;
+	t.translation = { 0.0f, 0.0f, 0.0f };
+	t.scale = { 275.0f, 1.0f, 275.0f };
+	t.rotation = { 0.0f, 0.0f, 0.0f };
+
+	GameObject roomLight = GameObject::createGameObject();
+	roomLight.setModel(quadLight, true);
+	roomLight.transform.translation = { 275.0f, 549.0f, 300.0f };
+	roomLight.transform.scale = { 65.0f, 1.0f, 50.0f };
+	roomLight.transform.rotation = { 0, 0, 0 };
+
+	GameObject bottomWall = GameObject::createGameObject();
+	bottomWall.setModel(quadWhite, true);
+	bottomWall.transform = t; // copy
+	bottomWall.transform.translation = { 275.0f, 0.0f, 275.0f };
+	bottomWall.transform.rotation = { 0, 0, 0 };
+
+	GameObject backWall = GameObject::createGameObject();
+	backWall.setModel(quadRed, true);
+	backWall.transform = t;
+	backWall.transform.translation = { 275.0f, 275.0f, 550.0f };
+	backWall.transform.rotation = { glm::pi<f32>() / 2, 0, 0 };
+
+	std::shared_ptr<RTModel> sphere = loadModel(200.0f, whiteDiff);
+	GameObject dummySphere = GameObject::createGameObject();
+	dummySphere.setModel(sphere, false);
+	dummySphere.transform.translation = { 100.0f, 445.0f, 215.0f };
+	
+	scene->addGameObject(std::move(roomLight));
+	scene->addGameObject(std::move(bottomWall));
+	scene->addGameObject(std::move(backWall));
+	scene->addGameObject(std::move(dummySphere));
+
+	scene->setRaysPerPixel(16);
+	scene->setMaxRaytraceDepth(8);
+	scene->getCamera().setVerticalFOV(40.0f);
+	scene->prepForRender();
+}
+
+auto complexScene(std::unique_ptr<RaytraceScene>& scene) -> void {
+	SceneTypes::Material light(glm::vec3(15.0, 15.0, 15.0), SceneTypes::MaterialType::LIGHT);
+	SceneTypes::Material whiteDiff(glm::vec3(0.33, 0.73, 0.33), SceneTypes::MaterialType::DIFFUSE);
+	SceneTypes::Material redDiff(glm::vec3(0.65, 0.05, 0.05), SceneTypes::MaterialType::DIFFUSE);
+	SceneTypes::Material blueDiff(glm::vec3(0.12, 0.15, 0.45), SceneTypes::MaterialType::DIFFUSE);
+	std::shared_ptr<RTModel> quadLight = loadModel("models/quad.obj", light);
+	std::shared_ptr<RTModel> quadWhite = loadModel("models/quad.obj", whiteDiff);
+	std::shared_ptr<RTModel> monkeyRed = loadModel("models/monkey.obj", redDiff);
+	std::shared_ptr<RTModel> monkeyBlue = loadModel("models/monkey.obj", blueDiff);
+
+	TransformComponent t;
+	t.translation = { 0.0f, 0.0f, 0.0f };
+	t.scale = { 275.0f, 1.0f, 275.0f };
+	t.rotation = { 0.0f, 0.0f, 0.0f };
+
+	GameObject roomLight = GameObject::createGameObject();
+	roomLight.setModel(quadLight, true);
+	roomLight.transform.translation = { 275.0f, 549.0f, 300.0f };
+	roomLight.transform.scale = { 65.0f, 1.0f, 50.0f };
+	roomLight.transform.rotation = { 0, 0, 0 };
+
+	GameObject bottomWall = GameObject::createGameObject();
+	bottomWall.setModel(quadWhite, true);
+	bottomWall.transform = t; // copy
+	bottomWall.transform.translation = { 275.0f, 0.0f, 275.0f };
+	bottomWall.transform.rotation = { 0, 0, 0 };
+
+	GameObject backWall = GameObject::createGameObject();
+	backWall.setModel(quadWhite, true);
+	backWall.transform = t;
+	backWall.transform.translation = { 275.0f, 275.0f, 550.0f };
+	backWall.transform.rotation = { glm::pi<f32>() / 2, 0, 0 };
+
+	std::shared_ptr<RTModel> sphere = loadModel(40.0f, redDiff);
+	GameObject dummySphere = GameObject::createGameObject();
+	dummySphere.setModel(sphere, false);
+	dummySphere.transform.translation = { 100.0f, 215.0f, 50.0f }; // 200.0f, 215.0f, 50.0f
+
+	GameObject monkey1 = GameObject::createGameObject();
+	monkey1.setModel(monkeyRed, true);
+	monkey1.transform.translation = { 375.0f, 375.0f, 275.0f };
+	monkey1.transform.scale = { 100.0f, 100.0f, 100.0f };
+	monkey1.transform.rotation = { glm::radians(-35.0f), glm::radians(180.0f), glm::radians(15.0f) };
+
+	GameObject monkey2 = GameObject::createGameObject();
+	monkey2.setModel(monkeyBlue, true);
+	monkey2.transform.translation = { 175.0f, 125.0f, 275.0f };
+	monkey2.transform.scale = { 100.0f, 100.0f, 100.0f };
+	monkey2.transform.rotation = { glm::radians(-36.0f), glm::radians(180.0f), glm::radians(21.0f) };
+
+	scene->addGameObject(std::move(roomLight));
+	scene->addGameObject(std::move(bottomWall));
+	scene->addGameObject(std::move(backWall));
+	//scene->addGameObject(std::move(monkey1));
+	scene->addGameObject(std::move(monkey2));
+	scene->addGameObject(std::move(dummySphere));
+
+	scene->setRaysPerPixel(8);
+	scene->setMaxRaytraceDepth(8);
 	scene->getCamera().setVerticalFOV(40.0f);
 	scene->prepForRender();
 }

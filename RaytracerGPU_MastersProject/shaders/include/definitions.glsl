@@ -49,7 +49,37 @@ struct HitRecord {
 	float v;
 };
 
+struct AABB {
+	float minX; float maxX;
+	float minY; float maxY;
+	float minZ; float maxZ;
+};
+
+struct MortonPrimitive {
+	uint code;
+	uint primitiveIndex;
+	uint primitiveType;
+};
+
+#define INVALID_HLBVHNODE_INDEX 0
+
+struct HLBVHNode {
+	AABB aabb;
+	uint leftIndex;
+	uint rightIndex;
+	uint primitiveIndex;
+	uint primitiveType;
+};
+
+struct HLBVHAABBConstructionInfo {
+	uint parent;
+	int visitationCount;
+};
+
 #define LIGHT_MATERIAL 0
 #define DIFFUSE_MATERIAL 1
 #define METALLIC_MATERIAL 2
 #define DIELECTRIC_MATERIAL 3
+
+#define SPHERE_PRIMITIVE 0
+#define TRIANGLE_PRIMITIVE 1

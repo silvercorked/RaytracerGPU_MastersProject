@@ -1,0 +1,215 @@
+#version 460
+
+#extension GL_GOOGLE_include_directive: enable
+
+#include "../include/definitions.glsl"
+
+layout(local_size_x = 256) in;
+
+layout(binding = 0) uniform ParameterUBO {
+	vec4 camPos; // ignore w
+	vec4 camLookAt; // ignore w
+	vec4 camUpDir; // ignore w
+	float verticalFOV;
+	uint numTriangles;
+	uint numSpheres;
+	uint numMaterials;
+	uint numLights;
+	uint maxRayTraceDepth;
+	uint randomState;
+} ubo;
+
+layout(std430, binding = 1) buffer TriangleBufferObject {
+	Triangle triangles[ ];
+};
+layout(std430, binding = 2) buffer SpheresBufferObject {
+	Sphere spheres[ ];
+};
+layout(std430, binding = 3) buffer MortonPrimitivesBufferObject {
+	MortonPrimitive mortonPrimitives[ ];
+};
+layout(std430, binding = 4) buffer HLBVH {
+	HLBVHNode nodes[ ]; // Leaf + internal = num elems + num elements - 1
+};
+layout(std430, binding = 5) buffer HLBVHAABBConstructionInfoBufferObject {
+	HLBVHAABBConstructionInfo constructionInfo[ ];
+};
+
+const float DELTA = 0.001;
+const float PADDING = DELTA / 2;
+
+void padAABB(inout AABB box) {
+	if (box.maxX - box.minX < DELTA) {
+		box.minX -= PADDING;
+		box.maxX += PADDING;
+	}
+	if (box.maxY - box.minY < DELTA) {
+		box.minY -= PADDING;
+		box.maxY += PADDING;
+	}
+	if (box.maxZ - box.minZ < DELTA) {
+		box.minZ -= PADDING;
+		box.maxZ += PADDING;
+	}
+}
+
+// returns the index of the most signficant bit of difference between mortoncodes for primitives at i and j
+// in other words, counts leading sames until first difference (counting leading zeroes till 1)
+int countLeadingZeroesFromDifference(int i, int j) { // the prefix between codes encodes the least common ancestor (node furthest from root in which both i and j primitive are a child to)
+	if (j < 0 || j > (ubo.numTriangles + ubo.numSpheres) - 1) {
+		return -1;
+	}
+	uint codeI = mortonPrimitives[i].code;
+	uint codeJ = mortonPrimitives[j].code;
+	if (codeI == codeJ) { // duplicate mortoncodes // get unique id beside morton code to make a prefix length
+		uint elemIdI = i; //mortonPrimitives[i].primitiveIndex + (ubo.numTriangles * (mortonPrimitives[i].primitiveType == SPHERE_PRIMITIVE ? 1 : 0)); // need to scale in case of sphere
+		uint elemIdJ = j; //mortonPrimitives[j].primitiveIndex + (ubo.numTriangles * (mortonPrimitives[j].primitiveType == SPHERE_PRIMITIVE ? 1 : 0));
+		return 32 + 31 - findMSB(elemIdI ^ elemIdJ);
+	}
+	return 31 - findMSB(codeI ^ codeJ);
+}
+
+void determineRange(int id, out int lower, out int upper) {
+	// determine direction of range
+	const int deltaL = countLeadingZeroesFromDifference(id, id - 1);
+	const int deltaR = countLeadingZeroesFromDifference(id, id + 1);
+	const int dir = (deltaR >= deltaL) ? 1 : -1;
+	
+	// compute upper bound for length of range
+	const int deltaMin = min(deltaL, deltaR);
+	int lMax = 2;
+	while (countLeadingZeroesFromDifference(id, id + lMax * dir) > deltaMin) { // keep going till prefix shrinks below min, look further for bigger difference
+		lMax <<= 1;
+	}
+
+	// use binary search to find other end of range
+	int l = 0;
+	for (int t = lMax >> 1; t > 0; t >>= 1) { // if divide lMax by 2 and set 2.
+		if (countLeadingZeroesFromDifference(id, id + (l + t) * dir) > deltaMin) { // if t != 0, check if there is still a bigger prefix,
+			l += t; // if so, add to l, divide t by 2, then look again.
+		} // if not, divide t by and look again.
+	}
+	int endId = id + l * dir;
+
+	lower = min(id, endId);
+	upper = max(id, endId);
+}
+
+int findSplit(int first, int last) {
+	int commonPrefix = countLeadingZeroesFromDifference(first, last);
+
+	// binary search to find where the next bit differs
+	int split = first;
+	int stride = last - first;
+	do {
+		stride = stride + 1 >> 1; // divide by 2 each time
+		int newSplit = split + stride; // possible new split location
+		if (newSplit < last) { // split within range
+			int splitPrefix = countLeadingZeroesFromDifference(first, newSplit);
+			if (splitPrefix > commonPrefix) { // if bigger prefix
+				split = newSplit; // set new split location
+			}
+		}
+	} while (stride > 1);
+	return split;
+}
+
+AABB getSphereAABB(uint sphereIndex) {
+	AABB box;
+	Sphere s = spheres[sphereIndex];
+	vec3 radiusVec = s.radius.xxx; // fancy swizzling
+	vec3 l = s.center.xyz - s.radius;
+	vec3 r = s.center.xyz + s.radius;
+	box.minX = min(l.x, r.x);
+	box.maxX = max(l.x, r.x);
+	box.minY = min(l.y, r.y);
+	box.maxY = max(l.y, r.y);
+	box.minZ = min(l.z, r.z);
+	box.maxZ = max(l.z, r.z);
+	return box;
+}
+
+AABB getTriangleAABB(uint triangleIndex) {
+	AABB box;
+	Triangle t = triangles[triangleIndex];
+	//vec4 outerPoint = t.v0 + (t.v1 - t.v0) + (t.v2 - t.v0); // this line is evil. idk how id does what it does but what it does is evil
+	box.minX = min(t.v0.x, min(t.v1.x, t.v2.x));
+	box.maxX = max(t.v0.x, max(t.v1.x, t.v2.x));
+	box.minY = min(t.v0.y, min(t.v1.y, t.v2.y));
+	box.maxY = max(t.v0.y, max(t.v1.y, t.v2.y));
+	box.minZ = min(t.v0.z, min(t.v1.z, t.v2.z));
+	box.maxZ = max(t.v0.z, max(t.v1.z, t.v2.z));
+	return box;
+}
+
+void main() {
+	uint globalWGInvoID = gl_GlobalInvocationID.x;
+	uint localWGInvoID = gl_LocalInvocationID.x;
+	const int primitiveCount = int(ubo.numTriangles + ubo.numSpheres);
+	const int leafOffset = primitiveCount - 1;
+
+	// leaf nodes
+	if (globalWGInvoID < primitiveCount) {
+		AABB curr;
+		uint type;
+		uint primIndex;
+		if (globalWGInvoID < ubo.numTriangles) {
+			type = TRIANGLE_PRIMITIVE;
+			primIndex = globalWGInvoID;
+			curr = getTriangleAABB(primIndex); // requires that globalWGInvoID >= primitive count on workgroup invocation
+		}
+		else {
+			type = SPHERE_PRIMITIVE;
+			primIndex = globalWGInvoID - ubo.numTriangles;
+			curr = getSphereAABB(primIndex); // requires that globalWGInvoID >= primitive count on workgroup invocation
+		}
+		padAABB(curr);
+		// could modify with for loop like in radix sort to allow smaller workgroup
+		nodes[leafOffset + globalWGInvoID] = HLBVHNode(curr, INVALID_HLBVHNODE_INDEX, INVALID_HLBVHNODE_INDEX, primIndex, type);
+	}
+
+	// internal nodes
+	if (globalWGInvoID < primitiveCount - 1) {
+		// figure out what range of objects the node corresponds to
+		int first; int last;
+		determineRange(int(globalWGInvoID), first, last);
+
+		// determine where to split the range
+		int split = findSplit(first, last);
+
+		// get left child
+		int leftChild = -1;
+		if (split == first) {
+			leftChild = leafOffset + split; // index of leaf node
+		}
+		else {
+			leftChild = split; // index of internal node
+		}
+
+		// get right child
+		int rightChild = -1;
+		if (split + 1 == last) {
+			rightChild = leafOffset + split + 1; 
+		}
+		else {
+			rightChild = split + 1;
+		}
+
+		// create internal node
+		nodes[globalWGInvoID] = HLBVHNode(
+			AABB(0, 0, 0, 0, 0, 0), // can't set AABB yet, as we are making all internal nodes at once. need extra step to go bottom up
+			leftChild,
+			rightChild,
+			INVALID_HLBVHNODE_INDEX, // these are all non-leaf nodes, ie, they don't have a primitive and only connect to other hlbvh nodes
+			0 // type info (no real type so just 0)
+		);
+
+		constructionInfo[leftChild] = HLBVHAABBConstructionInfo(globalWGInvoID, 0);
+		constructionInfo[rightChild] = HLBVHAABBConstructionInfo(globalWGInvoID, 0);
+		// these 2 make a construction info corresponding to every hlbvh node index except the root
+	}
+
+	if (globalWGInvoID == 0) { // setup root node construction info
+		constructionInfo[0] = HLBVHAABBConstructionInfo(0, 0);
+	}
+}

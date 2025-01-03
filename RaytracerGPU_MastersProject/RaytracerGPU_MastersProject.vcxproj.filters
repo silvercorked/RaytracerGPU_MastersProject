@@ -21,9 +21,6 @@
     <ClCompile Include="utils\Bitmap.hpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="LogisticMap.hpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="VulkanWrapper\Window.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -120,13 +117,10 @@
     <ClCompile Include="VulkanWrapper\RTModel.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="LogisticMap.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Raytracer.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="Scenes.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="RaytracerBVH.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -137,14 +131,19 @@
     </None>
     <None Include="shaders\vertex\SingleTriangleFullScreen.vert" />
     <None Include="shaders\fragment\SingleTriangleFullScreen.frag" />
-    <None Include="shaders\compute\raytrace.comp" />
+    <None Include="shaders\compute\raytraceBVH.comp" />
     <None Include="shaders\include\definitions.glsl" />
     <None Include="shaders\include\random.glsl" />
     <None Include="shaders\compute\ModelSpaceToWorldSpace.comp" />
+    <None Include="shaders\compute\ConstructAABBsOfInternalNodes.comp" />
+    <None Include="shaders\compute\GenerateMortonCodesOfPrimitives.comp" />
+    <None Include="shaders\compute\RadixSortSimple.comp" />
+    <None Include="shaders\compute\ConstructHLBVH.comp" />
+    <None Include="shaders\compute\raytrace.comp" />
+    <None Include="shaders\compute\GetEnclosingAABB.comp" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="Plan.txt" />
-    <Text Include="README.txt" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="VulkanWrapper\GameObject.hpp">
@@ -168,13 +167,22 @@
     <ClInclude Include="VulkanWrapper\KeyboardMovementController.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Raytracer.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Scenes.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Config.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="utils\Functors.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="utils\Functions.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="utils\Concepts.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="RaytracerBVH.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
