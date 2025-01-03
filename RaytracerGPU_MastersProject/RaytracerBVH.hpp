@@ -272,6 +272,10 @@ namespace RaytracerBVHRenderer {
 			this->scene->updateScene();
 			this->scene->getCamera().updateCameraForFrame(this->window, frameTime, this->swapChain->extentAspectRatio());
 
+			newTime = std::chrono::high_resolution_clock::now();
+			auto updateSceneTime = std::chrono::duration_cast<std::chrono::microseconds>(newTime - currentTime);
+			currentTime = newTime;
+
 			if constexpr (Config::ShowBufferDebug) {
 				auto resultFromGPU = this->DEBUGgetDeployedBufferAs<SceneTypes::GPU::Model>(
 					this->scene->getModelBuffer()->getBuffer(),
@@ -329,6 +333,10 @@ namespace RaytracerBVHRenderer {
 			this->recordComputeS2CommandBuffer(this->computeS2CommandBuffers[frameIndex], imageIndex);
 			this->recordGraphicsCommandBuffer(this->graphicsCommandBuffer, imageIndex);
 
+			newTime = std::chrono::high_resolution_clock::now();
+			auto rerecordCommandBuffersTime = std::chrono::duration_cast<std::chrono::microseconds>(newTime - currentTime);
+			currentTime = newTime;
+
 			RaytracerBVHRenderer::RaytracingUniformBufferObject rUbo{};
 			rUbo.camPos = glm::vec3(275.0f, 275.0f, -800.0f);
 			rUbo.camLookAt = glm::vec3(275.0f, 275.0f, 0.0f);
@@ -384,7 +392,7 @@ namespace RaytracerBVHRenderer {
 
 			vkResetFences(this->device.device(), 1, &this->computeS1Complete);
 			newTime = std::chrono::high_resolution_clock::now();
-			auto prepForCompute1Time = std::chrono::duration_cast<std::chrono::microseconds>(newTime - currentTime);
+			auto flushUBOAndAwaitFenceComputeS1Time = std::chrono::duration_cast<std::chrono::microseconds>(newTime - currentTime);
 			currentTime = newTime;
 
 			auto subRes1 = vkQueueSubmit(this->device.computeQueue(), 1, &submitInfoS1, this->computeS1Complete);
@@ -399,7 +407,7 @@ namespace RaytracerBVHRenderer {
 			auto compute1Time = std::chrono::duration_cast<std::chrono::microseconds>(newTime - currentTime);
 			currentTime = newTime;
 			
-			if constexpr (Config::ShowBufferDebug) {
+			if constexpr (true || Config::ShowBufferDebug) {
 				auto mortonPrimitives = this->DEBUGgetDeployedBufferAs<SceneTypes::GPU::MortonPrimitive>(
 					this->mortonPrimitiveBuffer1->getBuffer(),
 					this->scene->getTriangleCount() + this->scene->getSphereCount()
@@ -412,6 +420,7 @@ namespace RaytracerBVHRenderer {
 					enclosingAABB[0].min.x, enclosingAABB[0].min.y, enclosingAABB[0].min.z,
 					enclosingAABB[0].max.x, enclosingAABB[0].max.y, enclosingAABB[0].max.z
 				);
+				
 				std::cout << "morton Primitives:\n";
 				for (auto i = 0; i < mortonPrimitives.size(); i++) {
 					std::cout << std::format(
@@ -420,7 +429,7 @@ namespace RaytracerBVHRenderer {
 						(mortonPrimitives[i].primitiveType == 0 ? "Sphere" : "Triangle"), mortonPrimitives[i].code
 					);
 				}
-
+				/*
 				auto bvhNodes = this->DEBUGgetDeployedBufferAs<SceneTypes::GPU::BVHNode>(
 					this->HLBVHNodesBuffer->getBuffer(),
 					this->scene->getTriangleCount() + this->scene->getSphereCount() + this->scene->getTriangleCount() + this->scene->getSphereCount() - 1
@@ -440,6 +449,7 @@ namespace RaytracerBVHRenderer {
 						);
 					}
 				}
+				*/
 			}
 			/*
 			auto [minVec3, maxVec3] = this->scene->findEnclosingAABB(AABBs);
@@ -474,12 +484,14 @@ namespace RaytracerBVHRenderer {
 			this->swapChain->submitCommandBuffers(&this->graphicsCommandBuffer, &imageIndex);
 
 			std::cout << std::format(
-				"\tprevPresentTime: {}, Compute1Time: {}, compute2Time: {}"
-				"\n\tprepForCompute1Time: {}, prepForCompute2Time: {}"
+				"TIMINGS:"
+				"\n\tprevPresentTime: {}, Compute1Time: {}, compute2Time: {}"
+				"\n\tupdateSceneTime: {}, recordCommandBuffersTime: {}, flushUBOAndAwaitFenceComputeS1Time: {}, prepForCompute2Time: {}"
 				"\n\tTotal BVH Build Time: {}, Total Raytracing Time: {}, otherTime: {}\n",
 				prevPresentTime, compute1Time, compute2Time,
-				prepForCompute1Time, prepForCompute2Time,
-				prepForCompute1Time + compute1Time, prepForCompute2Time + compute2Time, prevPresentTime
+				updateSceneTime, rerecordCommandBuffersTime, flushUBOAndAwaitFenceComputeS1Time, prepForCompute2Time,
+				updateSceneTime + rerecordCommandBuffersTime + flushUBOAndAwaitFenceComputeS1Time + compute1Time,
+				prepForCompute2Time + compute2Time, prevPresentTime
 			);
 		}
 

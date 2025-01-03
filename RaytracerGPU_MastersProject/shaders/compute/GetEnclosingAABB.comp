@@ -94,7 +94,7 @@ void main() {
 	localMin = subgroupMin(localMin);
 	localMax = subgroupMax(localMax);
 
-	if (workGroupInvoID < primitiveCount && subgroupElect()) { // only invocations with respective primitives. otherwise junk from localMin and localMax could get in
+	if (workGroupInvoID < primitiveCount && subGroupInvoId == 0) { // only invocations with respective primitives. otherwise junk from localMin and localMax could get in
 		while (semaphore != subGroupID); // wait for turn
 
 		enclosingAABB.eMin = min(enclosingAABB.eMin, vec4(localMin, 0));

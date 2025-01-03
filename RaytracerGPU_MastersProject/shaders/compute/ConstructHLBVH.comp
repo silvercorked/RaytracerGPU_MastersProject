@@ -55,17 +55,15 @@ void padAABB(inout AABB box) {
 
 // returns the index of the most signficant bit of difference between mortoncodes for primitives at i and j
 // in other words, counts leading sames until first difference (counting leading zeroes till 1)
-int delta(int i, int j) {
+int countLeadingZeroesFromDifference(int i, int j) { // the prefix between codes encodes the least common ancestor (node furthest from root in which both i and j primitive are a child to)
 	if (j < 0 || j > (ubo.numTriangles + ubo.numSpheres) - 1) {
 		return -1;
 	}
 	uint codeI = mortonPrimitives[i].code;
 	uint codeJ = mortonPrimitives[j].code;
 	if (codeI == codeJ) { // duplicate mortoncodes // get unique id beside morton code to make a prefix length
-		uint elemIdI = mortonPrimitives[i].primitiveIndex
-			+ (ubo.numTriangles * (mortonPrimitives[i].primitiveType == SPHERE_PRIMITIVE ? 1 : 0)); // need to scale in case of sphere
-		uint elemIdJ = mortonPrimitives[j].primitiveIndex
-			+ (ubo.numTriangles * (mortonPrimitives[j].primitiveType == SPHERE_PRIMITIVE ? 1 : 0));
+		uint elemIdI = i; //mortonPrimitives[i].primitiveIndex + (ubo.numTriangles * (mortonPrimitives[i].primitiveType == SPHERE_PRIMITIVE ? 1 : 0)); // need to scale in case of sphere
+		uint elemIdJ = j; //mortonPrimitives[j].primitiveIndex + (ubo.numTriangles * (mortonPrimitives[j].primitiveType == SPHERE_PRIMITIVE ? 1 : 0));
 		return 32 + 31 - findMSB(elemIdI ^ elemIdJ);
 	}
 	return 31 - findMSB(codeI ^ codeJ);
@@ -73,22 +71,21 @@ int delta(int i, int j) {
 
 void determineRange(int id, out int lower, out int upper) {
 	// determine direction of range
-	const uint code = mortonPrimitives[id].code;
-	const int deltaL = delta(id, id - 1);
-	const int deltaR = delta(id, id + 1);
+	const int deltaL = countLeadingZeroesFromDifference(id, id - 1);
+	const int deltaR = countLeadingZeroesFromDifference(id, id + 1);
 	const int dir = (deltaR >= deltaL) ? 1 : -1;
 	
 	// compute upper bound for length of range
 	const int deltaMin = min(deltaL, deltaR);
 	int lMax = 2;
-	while (delta(id, id + lMax * dir) > deltaMin) { // while difference in MSB is less than min, look further for bigger difference
+	while (countLeadingZeroesFromDifference(id, id + lMax * dir) > deltaMin) { // keep going till prefix shrinks below min, look further for bigger difference
 		lMax <<= 1;
 	}
 
 	// use binary search to find other end of range
 	int l = 0;
 	for (int t = lMax >> 1; t > 0; t >>= 1) { // if divide lMax by 2 and set 2.
-		if (delta(id, id + (l + t) * dir) > deltaMin) { // if t != 0, check if there is still a bigger difference,
+		if (countLeadingZeroesFromDifference(id, id + (l + t) * dir) > deltaMin) { // if t != 0, check if there is still a bigger prefix,
 			l += t; // if so, add to l, divide t by 2, then look again.
 		} // if not, divide t by and look again.
 	}
@@ -99,7 +96,7 @@ void determineRange(int id, out int lower, out int upper) {
 }
 
 int findSplit(int first, int last) {
-	int commonPrefix = delta(first, last);
+	int commonPrefix = countLeadingZeroesFromDifference(first, last);
 
 	// binary search to find where the next bit differs
 	int split = first;
@@ -108,8 +105,8 @@ int findSplit(int first, int last) {
 		stride = stride + 1 >> 1; // divide by 2 each time
 		int newSplit = split + stride; // possible new split location
 		if (newSplit < last) { // split within range
-			int splitPrefix = delta(first, newSplit);
-			if (splitPrefix > commonPrefix) {
+			int splitPrefix = countLeadingZeroesFromDifference(first, newSplit);
+			if (splitPrefix > commonPrefix) { // if bigger prefix
 				split = newSplit; // set new split location
 			}
 		}
@@ -135,13 +132,13 @@ AABB getSphereAABB(uint sphereIndex) {
 AABB getTriangleAABB(uint triangleIndex) {
 	AABB box;
 	Triangle t = triangles[triangleIndex];
-	vec4 outerPoint = t.v0 + (t.v1 - t.v0) + (t.v2 - t.v0);
-	box.minX = min(t.v0.x, outerPoint.x);
-	box.maxX = max(t.v0.x, outerPoint.x);
-	box.minY = min(t.v0.y, outerPoint.y);
-	box.maxY = max(t.v0.y, outerPoint.y);
-	box.minZ = min(t.v0.z, outerPoint.z);
-	box.maxZ = max(t.v0.z, outerPoint.z);
+	//vec4 outerPoint = t.v0 + (t.v1 - t.v0) + (t.v2 - t.v0); // this line is evil. idk how id does what it does but what it does is evil
+	box.minX = min(t.v0.x, min(t.v1.x, t.v2.x));
+	box.maxX = max(t.v0.x, max(t.v1.x, t.v2.x));
+	box.minY = min(t.v0.y, min(t.v1.y, t.v2.y));
+	box.maxY = max(t.v0.y, max(t.v1.y, t.v2.y));
+	box.minZ = min(t.v0.z, min(t.v1.z, t.v2.z));
+	box.maxZ = max(t.v0.z, max(t.v1.z, t.v2.z));
 	return box;
 }
 

@@ -270,17 +270,15 @@ auto cornellBoxScene(std::unique_ptr<RaytraceScene>& scene) -> void {
 	cube2.setModel(cubeWhite, true);
 	cube2.transform.translation = { 180.0f, 160.0f, 175.0f };
 	cube2.transform.scale = { 80.0f, 80.0f, 80.0f };
-	cube2.transform.rotation = { glm::radians(45.0f), glm::radians(-45.0f), glm::radians(45.0f) };
-
-	std::cout << "id:" << cube2.getId() << "\n";
+	cube2.transform.rotation = { 0, glm::radians(-18.0f), 0}; // glm::radians(45.0f), glm::radians(-45.0f), glm::radians(45.0f)
 
 	scene->addGameObject(std::move(cube1));
 	scene->addGameObject(std::move(cube2));
 
-	std::shared_ptr<RTModel> sphere = loadModel(40.0f, whiteDiff);
+	std::shared_ptr<RTModel> sphere = loadModel(1.0f, whiteDiff);
 	GameObject dummySphere = GameObject::createGameObject();
 	dummySphere.setModel(sphere, false);
-	dummySphere.transform.translation = { 200.0f, 400.0f, 400.0f }; // requires 1 sphere min rn, so just throw this out of the way
+	dummySphere.transform.translation = { -200.0f, 215.0f, -50.0f }; // requires 1 sphere min rn, so just throw this out of the way
 	scene->addGameObject(std::move(dummySphere));
 
 	scene->setRaysPerPixel(128);
@@ -369,10 +367,10 @@ auto complexScene(std::unique_ptr<RaytraceScene>& scene) -> void {
 	backWall.transform.translation = { 275.0f, 275.0f, 550.0f };
 	backWall.transform.rotation = { glm::pi<f32>() / 2, 0, 0 };
 
-	std::shared_ptr<RTModel> sphere = loadModel(1.0f, whiteDiff);
+	std::shared_ptr<RTModel> sphere = loadModel(40.0f, redDiff);
 	GameObject dummySphere = GameObject::createGameObject();
 	dummySphere.setModel(sphere, false);
-	dummySphere.transform.translation = { -100.0f, 445.0f, -215.0f };
+	dummySphere.transform.translation = { 100.0f, 215.0f, 50.0f }; // 200.0f, 215.0f, 50.0f
 
 	GameObject monkey1 = GameObject::createGameObject();
 	monkey1.setModel(monkeyRed, true);
@@ -384,17 +382,17 @@ auto complexScene(std::unique_ptr<RaytraceScene>& scene) -> void {
 	monkey2.setModel(monkeyBlue, true);
 	monkey2.transform.translation = { 175.0f, 125.0f, 275.0f };
 	monkey2.transform.scale = { 100.0f, 100.0f, 100.0f };
-	monkey2.transform.rotation = { glm::radians(-35.0f), glm::radians(180.0f), glm::radians(15.0f) };
+	monkey2.transform.rotation = { glm::radians(-36.0f), glm::radians(180.0f), glm::radians(21.0f) };
 
 	scene->addGameObject(std::move(roomLight));
 	scene->addGameObject(std::move(bottomWall));
 	scene->addGameObject(std::move(backWall));
-	scene->addGameObject(std::move(monkey1));
+	//scene->addGameObject(std::move(monkey1));
 	scene->addGameObject(std::move(monkey2));
 	scene->addGameObject(std::move(dummySphere));
 
-	scene->setRaysPerPixel(32);
-	scene->setMaxRaytraceDepth(16);
+	scene->setRaysPerPixel(8);
+	scene->setMaxRaytraceDepth(8);
 	scene->getCamera().setVerticalFOV(40.0f);
 	scene->prepForRender();
 }

@@ -508,7 +508,7 @@ namespace RaytracerBVHRenderer {
 		);
 
 		this->scene = std::make_unique<RaytraceScene>(this->device);
-		cornellBoxScene(this->scene);
+		complexScene(this->scene);
 
 		const u32 primCount = this->scene->getTriangleCount() + this->scene->getSphereCount();
 		
